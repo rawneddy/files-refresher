@@ -116,7 +116,7 @@ class FileRefresher:
         with self.console.status("[primary]Press ENTER to continue...[/primary]", spinner="dots"):
             input()
     
-    def _show_step_header(self, title: str, step_info: str = ""):
+    def _show_step_header(self, title: str, step_info: str = "", selected_path: str = ""):
         """Show consistent header for each step"""
         # Mini logo for consistency
         self.console.print("╔═══════════════════════════════════════════════════╗", style="border")
@@ -126,6 +126,13 @@ class FileRefresher:
         
         if step_info:
             self.console.print(f"\n[info]{step_info}[/info]")
+            
+        if selected_path:
+            # Truncate path if too long for display
+            display_path = selected_path
+            if len(display_path) > 45:
+                display_path = "..." + display_path[-42:]
+            self.console.print(f"\n[accent]📁 Target: {display_path}[/accent]")
         
         self.console.print(f"\n[primary]{title}[/primary]")
         self.console.print("─" * 50, style="border")
@@ -133,7 +140,7 @@ class FileRefresher:
     def get_mode_selection(self) -> str:
         """Get user selection for operation mode"""
         self.console.clear()
-        self._show_step_header("MODE SELECTION", "Step 1 of 4")
+        self._show_step_header("MODE SELECTION", "Step 2 of 4")
         
         self.console.print("\n[accent]Choose operation mode:[/accent]")
         self.console.print("[secondary]D[/secondary] - Directory Mode: Process all files in a directory")
@@ -143,10 +150,10 @@ class FileRefresher:
             choice = Prompt.ask("\n[prompt]> SELECT MODE [D/C][/prompt]", choices=["D", "C", "d", "c"], default="D")
             return choice.upper()
     
-    def get_operation_type(self) -> str:
+    def get_operation_type(self, selected_path: str = "") -> str:
         """Get user selection for operation type (Directory mode only)"""
         self.console.clear()
-        self._show_step_header("OPERATION TYPE", "Step 2 of 4")
+        self._show_step_header("OPERATION TYPE", "Step 4 of 4", selected_path)
         
         self.console.print("\n[accent]Choose operation type:[/accent]")
         self.console.print("[secondary]P[/secondary] - Process Files: Make actual changes to files")
@@ -159,7 +166,7 @@ class FileRefresher:
     def get_csv_input(self) -> str:
         """Get CSV input file path with validation"""
         self.console.clear()
-        self._show_step_header("CSV INPUT SELECTION", "Step 2 of 3")
+        self._show_step_header("CSV INPUT SELECTION", "Step 3 of 3")
         
         while True:
             csv_path = Prompt.ask("\n[prompt]> CSV INPUT FILE[/prompt]")
@@ -238,9 +245,9 @@ class FileRefresher:
     def show_config_review(self):
         """Display configuration review screen"""
         self.console.clear()
-        self._show_step_header("CONFIGURATION REVIEW", "Step 4 of 4")
+        self._show_step_header("CONFIGURATION REVIEW", "Step 1 of 4")
         
-        self.console.print("\n[accent]Review settings before proceeding:[/accent]")
+        self.console.print("\n[accent]Review default settings before proceeding:[/accent]")
         
         # Create extensions table
         table = Table(
@@ -313,10 +320,10 @@ class FileRefresher:
         
         return files
     
-    def show_pre_scan_summary(self, files: List[Dict]) -> bool:
+    def show_pre_scan_summary(self, files: List[Dict], selected_path: str = "") -> bool:
         """Display pre-scan summary and get confirmation"""
         self.console.clear()
-        self._show_step_header("FILE SCAN RESULTS", "Review before processing")
+        self._show_step_header("FILE SCAN RESULTS", "Review before processing", selected_path)
         # Categorize files
         stats = defaultdict(int)
         already_dated_dots = 0
@@ -634,7 +641,7 @@ class FileRefresher:
         self.console.print(f"\n[primary]SCANNING DIRECTORY...[/primary]")
         files = self.scan_directory(directory_path)
         
-        if not self.show_pre_scan_summary(files):
+        if not self.show_pre_scan_summary(files, directory_path):
             self.console.print("\n[warning]Operation cancelled by user[/warning]")
             return []
         
@@ -761,10 +768,10 @@ class FileRefresher:
         
         return results
     
-    def show_completion_summary(self, results):
+    def show_completion_summary(self, results, selected_path: str = ""):
         """Display completion summary"""
         self.console.clear()
-        self._show_step_header("PROCESSING COMPLETE", "Operation finished")
+        self._show_step_header("PROCESSING COMPLETE", "Operation finished", selected_path)
         renamed_count = sum(1 for r in results if r['renamed'])
         updated_count = sum(1 for r in results if r['date_updated'])
         
@@ -834,18 +841,20 @@ def main():
             # Interactive mode with retro UI
             refresher.show_welcome_screen()
             
+            # Show configuration review first
+            refresher.show_config_review()
+            
             # Get mode selection
             mode = refresher.get_mode_selection()
             
             if mode == "D":
                 # Directory Mode
                 directory = refresher.get_directory_input()
-                operation_type = refresher.get_operation_type()
+                operation_type = refresher.get_operation_type(directory)
                 
                 # Set dry run mode
                 refresher.dry_run = (operation_type == "R")
                 
-                refresher.show_config_review()
                 results = refresher.process_directory_with_progress(directory)
                 
                 # Generate CSV report
@@ -854,7 +863,7 @@ def main():
                 # Show completion summary with dry run indication
                 if refresher.dry_run:
                     refresher.console.print("\n[info]🔍 DRY RUN MODE - No files were actually modified[/info]")
-                refresher.show_completion_summary(results)
+                refresher.show_completion_summary(results, directory)
                 refresher.show_report_location(report_path)
                 
             else:
@@ -867,7 +876,7 @@ def main():
                 report_path = refresher.generate_csv_report(results, csv_dir)
                 
                 # Show completion summary
-                refresher.show_completion_summary(results)
+                refresher.show_completion_summary(results, csv_path)
                 refresher.show_report_location(report_path)
         else:
             # Command line mode (backward compatibility)
