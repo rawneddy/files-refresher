@@ -8,6 +8,8 @@ import os
 import sys
 import argparse
 import re
+import csv
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
@@ -48,10 +50,23 @@ class FileRefresher:
         self.processed_files = []
         self.interactive = interactive
         self.console = Console(theme=RETRO_THEME, force_terminal=True)
+        self.errors = []
+        self.setup_logging()
         
         # Date patterns
         self.date_pattern_dots = re.compile(r'^(\d{4})\.(\d{2})\.(\d{2})\s+(.+)$')
         self.date_pattern_hyphens = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\s+(.+)$')
+        
+    def setup_logging(self):
+        """Setup logging for error tracking"""
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('file_refresher.log'),
+                logging.StreamHandler() if not self.interactive else logging.NullHandler()
+            ]
+        )
         
     def _load_config(self, config_path):
         """Load configuration from YAML file"""
@@ -299,7 +314,7 @@ class FileRefresher:
         return filename
     
     def update_file_modified_date(self, file_path, new_date=None):
-        """Update file modification date"""
+        """Update file modification date with enhanced error handling"""
         if new_date is None:
             new_date = datetime.now()
         
@@ -307,23 +322,95 @@ class FileRefresher:
         timestamp = new_date.timestamp()
         
         try:
+            # Check if file is read-only and temporarily change permissions
+            original_mode = None
+            if not os.access(file_path, os.W_OK):
+                try:
+                    original_mode = file_path.stat().st_mode
+                    file_path.chmod(original_mode | 0o200)  # Add write permission
+                except Exception as perm_error:
+                    error_msg = f"Cannot modify read-only file {file_path}: {perm_error}"
+                    self.errors.append(error_msg)
+                    logging.warning(error_msg)
+                    if self.interactive:
+                        self.console.print(f"[warning]Skipping read-only file: {file_path.name}[/warning]")
+                    return False
+            
             # Update both access and modification times
             os.utime(file_path, (timestamp, timestamp))
+            
+            # Restore original permissions if we changed them
+            if original_mode is not None:
+                try:
+                    file_path.chmod(original_mode)
+                except Exception:
+                    pass  # Don't fail if we can't restore permissions
+            
             return True
-        except Exception as e:
+            
+        except PermissionError as e:
+            error_msg = f"Permission denied updating {file_path}: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
             if self.interactive:
-                self.console.print(f"[error]Error updating date for {file_path}: {e}[/error]")
+                self.console.print(f"[error]Permission denied: {file_path.name}[/error]")
+            return False
+        except Exception as e:
+            error_msg = f"Error updating date for {file_path}: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
+            if self.interactive:
+                self.console.print(f"[error]Error updating {file_path.name}: {e}[/error]")
             return False
     
     def rename_file(self, file_path, new_name):
-        """Rename file to new name"""
+        """Rename file to new name with enhanced error handling"""
         try:
             new_path = file_path.parent / new_name
+            
+            # Check if target already exists
+            if new_path.exists():
+                error_msg = f"Target file already exists: {new_path}"
+                self.errors.append(error_msg)
+                logging.warning(error_msg)
+                if self.interactive:
+                    self.console.print(f"[warning]Target exists, skipping: {new_name}[/warning]")
+                return None
+            
+            # Check if filename is too long for filesystem
+            if len(new_name) > 255:  # Most filesystems limit to 255 chars
+                error_msg = f"Filename too long: {new_name[:50]}..."
+                self.errors.append(error_msg)
+                logging.warning(error_msg)
+                if self.interactive:
+                    self.console.print(f"[warning]Filename too long, skipping: {file_path.name}[/warning]")
+                return None
+            
+            # Perform the rename
             file_path.rename(new_path)
+            logging.info(f"Renamed: {file_path.name} -> {new_name}")
             return new_path
-        except Exception as e:
+            
+        except PermissionError as e:
+            error_msg = f"Permission denied renaming {file_path}: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
             if self.interactive:
-                self.console.print(f"[error]Error renaming {file_path}: {e}[/error]")
+                self.console.print(f"[error]Permission denied renaming: {file_path.name}[/error]")
+            return None
+        except OSError as e:
+            error_msg = f"OS error renaming {file_path}: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
+            if self.interactive:
+                self.console.print(f"[error]OS error renaming: {file_path.name}[/error]")
+            return None
+        except Exception as e:
+            error_msg = f"Unexpected error renaming {file_path}: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
+            if self.interactive:
+                self.console.print(f"[error]Error renaming {file_path.name}: {e}[/error]")
             return None
     
     def process_file(self, file_info):
@@ -357,6 +444,56 @@ class FileRefresher:
                 result['date_updated'] = True
         
         return result
+    
+    def generate_csv_report(self, results, directory_path):
+        """Generate comprehensive CSV report"""
+        # Generate report filename
+        date_str = datetime.now().strftime('%Y.%m.%d')
+        filename_pattern = self.report_settings.get('filename_pattern', 'file_refresh_report_{date}.csv')
+        report_filename = filename_pattern.format(date=date_str)
+        
+        # Determine report location
+        if self.report_settings.get('save_in_target_directory', True):
+            report_path = Path(directory_path) / report_filename
+        else:
+            report_path = Path(report_filename)
+        
+        try:
+            with open(report_path, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = [
+                    'new_path',
+                    'original_modified', 
+                    'new_modified',
+                    'extension',
+                    'size_bytes'
+                ]
+                
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                for result in results:
+                    # Format dates for CSV
+                    original_modified = result['original_modified'].strftime('%Y-%m-%d %H:%M:%S')
+                    new_modified = result['new_modified'].strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    writer.writerow({
+                        'new_path': str(result['new_path']),
+                        'original_modified': original_modified,
+                        'new_modified': new_modified,
+                        'extension': result['extension'],
+                        'size_bytes': result['size_bytes']
+                    })
+            
+            logging.info(f"CSV report generated: {report_path}")
+            return report_path
+            
+        except Exception as e:
+            error_msg = f"Error generating CSV report: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
+            if self.interactive:
+                self.console.print(f"[error]Error generating report: {e}[/error]")
+            return None
     
     def process_directory_with_progress(self, directory_path):
         """Process all files in directory with progress display"""
@@ -419,6 +556,17 @@ class FileRefresher:
             self.console.print("\n[info]✓ All operations completed successfully![/info]")
         else:
             self.console.print("\n[warning]No files required processing[/warning]")
+        
+        # Show errors if any
+        if self.errors:
+            self.console.print(f"\n[warning]⚠ {len(self.errors)} errors occurred (see file_refresher.log)[/warning]")
+    
+    def show_report_location(self, report_path):
+        """Display report generation confirmation"""
+        if report_path:
+            self.console.print(f"\n[info]📄 CSV Report saved: {report_path}[/info]")
+        else:
+            self.console.print("\n[error]❌ Failed to generate CSV report[/error]")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -453,7 +601,13 @@ def main():
             directory = refresher.get_directory_input()
             refresher.show_config_review()
             results = refresher.process_directory_with_progress(directory)
+            
+            # Generate CSV report
+            report_path = refresher.generate_csv_report(results, directory)
+            
+            # Show completion summary
             refresher.show_completion_summary(results)
+            refresher.show_report_location(report_path)
         else:
             # Command line mode (backward compatibility)
             directory = args.directory or '.'
@@ -465,6 +619,9 @@ def main():
                 result = refresher.process_file(file_info)
                 results.append(result)
             
+            # Generate CSV report
+            report_path = refresher.generate_csv_report(results, directory)
+            
             # Summary
             renamed_count = sum(1 for r in results if r['renamed'])
             updated_count = sum(1 for r in results if r['date_updated'])
@@ -473,6 +630,12 @@ def main():
             print(f"Files processed: {len(results)}")
             print(f"Files renamed: {renamed_count}")
             print(f"Dates updated: {updated_count}")
+            
+            if report_path:
+                print(f"CSV Report saved: {report_path}")
+            
+            if refresher.errors:
+                print(f"Errors occurred: {len(refresher.errors)} (see file_refresher.log)")
         
     except KeyboardInterrupt:
         if interactive:
