@@ -250,12 +250,14 @@ class FileRefresher:
         self.console.print("\n[accent]Review default settings before proceeding:[/accent]")
         
         # Create extensions table
+        self.console.print("\n[primary]RENAME SETTINGS[/primary]")
+        self.console.print("[secondary]Files will be renamed with original date prefix (YYYY.MM.DD format)[/secondary]")
+        
         table = Table(
-            title="RENAME SETTINGS",
             box=ASCII,
             style="primary",
-            title_style="title",
-            border_style="border"
+            border_style="border",
+            show_header=True
         )
         
         table.add_column("Extension", style="accent")
