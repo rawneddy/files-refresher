@@ -5,10 +5,17 @@ A Python application designed to bypass file retention policies by updating modi
 ## 🚀 Quick Start
 
 ### Windows Users
-1. Download the latest release from [Releases](../../releases)
-2. Extract the ZIP file to your desired location
-3. Double-click `file_refresher.exe` to run the interactive interface
-4. Follow the on-screen prompts
+```bash
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+
+# Build Windows executable
+build_windows.bat
+
+# Run the executable
+file_refresher_windows\file_refresher.exe
+```
 
 ### Mac/Linux Users
 ```bash
@@ -16,12 +23,16 @@ A Python application designed to bypass file retention policies by updating modi
 git clone https://github.com/rawneddy/files-refresher.git
 cd files-refresher
 
-# Install dependencies
+# Option 1: Run directly with Python
 pip install -r requirements.txt
-
-# Run the application
 python3 file_refresher.py
+
+# Option 2: Build executable
+./build_mac.sh
+file_refresher_mac/file_refresher
 ```
+
+> **Note**: Pre-built releases will be available in the future. For now, please build locally using the instructions above.
 
 ## ✨ Features
 
@@ -130,20 +141,32 @@ Reports use versioned naming: `report_2025.07.11.csv`, `report_2025.07.11.01.csv
 - **Dry-Run Mode**: Preview all changes before execution
 - **Audit Trail**: Complete CSV reports for compliance
 
-## 🔨 Building from Source
+## 🔨 Building Executables
 
-### For Windows Executable
+### Automated Build (Recommended)
 ```bash
-# On Windows
-pip install pyinstaller
-python create_icon.py
+# Windows
 build_windows.bat
+
+# Mac/Linux  
+./build_mac.sh
 ```
 
-### For Development
+### Manual Build
 ```bash
-git clone https://github.com/rawneddy/files-refresher.git
-cd files-refresher
+# Install PyInstaller
+pip install pyinstaller
+
+# Generate icon
+python create_icon.py
+
+# Build with PyInstaller
+pyinstaller file_refresher.spec
+```
+
+### Development Mode
+```bash
+# Run directly without building
 pip install -r requirements.txt
 python3 file_refresher.py
 ```
