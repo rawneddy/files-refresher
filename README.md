@@ -44,11 +44,14 @@ cd dist/mac
 
 - **🔄 File Date Refresh**: Updates modification dates to bypass retention policies
 - **📅 Smart Renaming**: Preserves original dates in filenames (YYYY.MM.DD format)
-- **🖥️ Retro UI**: Apple II-style green terminal interface
-- **📊 CSV Reporting**: Detailed audit trails with versioned reports
+- **🖥️ Retro UI**: Apple II-style green terminal interface with step-by-step wizard
+- **📊 CSV Reporting**: Detailed audit trails with absolute paths and versioned reports
 - **🎯 Selective Processing**: Process specific files via CSV input
 - **🔍 Dry-Run Mode**: Preview changes before making them
 - **⚙️ Configurable**: YAML configuration for file extensions and settings
+- **📂 Drag & Drop**: Drag files/folders into terminal for easy path input
+- **🗂️ File Browser**: Built-in file/directory browser (type 'browse')
+- **🔄 Smart Filtering**: Automatically excludes CSV reports from processing
 
 ## 🎮 Interface Preview
 
@@ -73,10 +76,12 @@ Currently: 2018.03.15 Budget Report.xlsx
 ```bash
 python3 file_refresher.py
 ```
-- Guided wizard interface
-- Mode selection (Directory/CSV)
+- Configuration review first (Step 1 of 4)
+- Mode selection (Directory/CSV) with clear step indicators
+- Drag-and-drop support for files and directories
+- File browser integration (type 'browse')
 - Operation type selection (Process/Report Only)
-- Real-time progress tracking
+- Real-time progress tracking with screen clearing between steps
 
 ### Command Line Mode
 ```bash
@@ -113,11 +118,18 @@ python3 file_refresher.py /path/to/directory --no-ui
 Edit `config.yaml` to customize:
 
 ```yaml
-# File extensions to rename
+# File extensions to rename (PDF removed, Visio added)
 rename_extensions:
+  # Microsoft Office
   - .docx
+  - .doc
   - .xlsx
-  - .pdf
+  - .xls
+  - .pptx
+  - .ppt
+  # Microsoft Visio
+  - .vsdx
+  - .vsd
   # Add your custom extensions
 
 # Age threshold for date updates
@@ -184,13 +196,18 @@ python3 create_test_files.py
 
 # This creates a test_files/ directory with:
 # - Files of different ages (5-500 days old)
-# - Various file types (.docx, .xlsx, .pdf, .txt, .csv, .png)
+# - Various file types (.docx, .xlsx, .pptx, .vsdx, .txt, .png)
 # - Files with existing date prefixes (2019.06.15 format)
 # - Files needing date conversion (YYYY-MM-DD to YYYY.MM.DD)
 # - Recent files that shouldn't be modified
+# - CSV files are excluded from processing
 
 # Test the application with generated files
 python3 file_refresher.py test_files --dry-run
+
+# Reset test files to clean state
+rm -rf test_files
+python3 create_test_files.py
 ```
 
 ## 📚 Documentation
@@ -213,7 +230,8 @@ python3 file_refresher.py test_files --dry-run
 
 **CSV Input Not Working**
 - Check CSV format matches output format exactly
-- Verify file paths are absolute
+- Verify file paths are absolute (not relative)
+- Use recent CSV reports, not older ones (may reference renamed files)
 
 **PyInstaller Build Fails on Mac**
 - This is a known compatibility issue with Python 3.10.0 and 3.10.1

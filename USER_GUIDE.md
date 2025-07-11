@@ -269,23 +269,61 @@ C:\Docs\2019.06.22 Project Plan.docx,2019-06-22 09:11:45,2025-07-11 09:15:33,doc
 - Run quarterly on cold storage
 - Keep CSV reports for compliance
 
-## Advanced Usage
+## Testing and Development
 
-### Automation
+### Generating Test Files
 ```bash
-# Windows Task Scheduler
-file_refresher.exe --auto --directory "C:\Archives"
+# Create test files for development/testing
+python3 create_test_files.py
 
-# Mac/Linux cron
-0 0 1 * * python /path/to/file_refresher.py --auto --directory /archives
+# This creates test_files/ directory with:
+# - Microsoft Office files (.docx, .xlsx, .pptx)
+# - Microsoft Visio files (.vsdx, .vsd) 
+# - Files of various ages (5-500 days old)
+# - Files with existing date prefixes
+# - Files needing format conversion
+# - Files that should not be renamed
 ```
 
-### Batch Processing
-Create a CSV with multiple directories:
-```csv
-new_path,original_modified,new_modified,extension,size_bytes
-/archives/2018/files/...,2018-01-01 00:00:00,2025-07-11 00:00:00,xlsx,0
-/archives/2019/files/...,2019-01-01 00:00:00,2025-07-11 00:00:00,docx,0
+### Resetting Test Environment
+```bash
+# Reset to clean state
+rm -rf test_files
+python3 create_test_files.py
+
+# Verify clean state (should show 13 files)
+ls -la test_files/
+```
+
+### Test Workflow
+1. **Generate Test Files**: `python3 create_test_files.py`
+2. **Test Dry Run**: `python3 file_refresher.py test_files --dry-run`
+3. **Review Report**: Check generated CSV for expected changes
+4. **Test Processing**: `python3 file_refresher.py test_files`
+5. **Verify Results**: Check renamed files and updated dates
+6. **Reset for Next Test**: `rm -rf test_files && python3 create_test_files.py`
+
+### Testing Drag-and-Drop
+1. Run application in interactive mode
+2. When prompted for directory/CSV, drag file/folder into terminal
+3. Press Enter to process the pasted path
+4. Alternatively, type `browse` to open native file browser
+
+## Advanced Usage
+
+### Command Line Processing
+```bash
+# Direct directory processing
+python3 file_refresher.py /path/to/directory
+
+# Dry run mode
+python3 file_refresher.py /path/to/directory --dry-run
+
+# CSV input mode
+python3 file_refresher.py --csv-input report.csv
+
+# Non-interactive mode
+python3 file_refresher.py /path/to/directory --no-ui
 ```
 
 ## Support

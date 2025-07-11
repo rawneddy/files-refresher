@@ -54,7 +54,8 @@ files-refresher/
 ### 1. File Processing Logic
 
 #### Renaming Rules
-- **Target Extensions**: Defined in config.yaml (default: .docx, .xlsx, .pptx, .pdf, etc.)
+- **Target Extensions**: Defined in config.yaml (default: .docx, .doc, .xlsx, .xls, .pptx, .ppt, .vsdx, .vsd)
+- **Excluded Extensions**: CSV files are automatically excluded from processing
 - **Date Detection Patterns**:
   - No date → Add `YYYY.MM.DD` prefix using original modified date
   - `YYYY-MM-DD` prefix → Convert to `YYYY.MM.DD`
@@ -83,27 +84,29 @@ files-refresher/
 
 ### 3. User Interface Design
 
-#### Screen Flow
+#### Screen Flow (Updated)
 1. **Welcome Screen**
    - ASCII art logo
    - Version information
    - Retro Apple II green theme (#33FF33)
 
-2. **Mode Selection**
-   - [D]irectory or [C]SV Input
-
-3. **Input Selection**
-   - Directory: Path input with validation
-   - CSV: File path input with format validation
-
-4. **Configuration Review** (Directory mode only)
+2. **Configuration Review** (Step 1 of 4)
    - Display active extensions from config.yaml
    - Show modification threshold
    - Option to exit and modify config
 
-5. **Operation Type** (Directory mode only)
+3. **Mode Selection** (Step 2 of 4)
+   - [D]irectory or [C]SV Input
+   - Clear screen between steps
+
+4. **Input Selection** (Step 3 of 4)
+   - Directory: Path input with validation, drag-and-drop, file browser
+   - CSV: File path input with validation, drag-and-drop, file browser
+
+5. **Operation Type** (Step 4 of 4, Directory mode only)
    - [P]rocess Files
    - [R]eport Only
+   - Shows selected path at top of screen
 
 6. **Pre-scan Summary**
    - File type breakdown
@@ -172,8 +175,9 @@ rename_extensions:
   - .xls
   - .pptx
   - .ppt
-  # Documents
-  - .pdf
+  # Microsoft Visio
+  - .vsdx
+  - .vsd
   # Add custom extensions below
   # - .dwg
   # - .txt
@@ -262,6 +266,39 @@ ui:
 - Prevent directory traversal
 - Validate absolute paths only
 - Check write permissions before starting
+
+## Testing Framework
+
+### Test File Generation
+```bash
+# Generate fresh test files
+python3 create_test_files.py
+
+# This creates test_files/ directory with:
+# - Office documents (.docx, .xlsx, .pptx)
+# - Visio diagrams (.vsdx, .vsd) 
+# - Files with various ages (5-500 days old)
+# - Files with existing date prefixes (YYYY.MM.DD format)
+# - Files needing conversion (YYYY-MM-DD format)
+# - Files that should not be renamed (.txt, .png, .csv)
+```
+
+### Test Environment Reset
+```bash
+# Clean slate for testing
+rm -rf test_files
+python3 create_test_files.py
+
+# Verify clean state
+ls -la test_files/  # Should show 13 original files
+```
+
+### Test Scenarios
+1. **Fresh Directory Processing**: Use clean test_files with mixed file types
+2. **CSV Report Generation**: Test dry-run mode for report creation
+3. **CSV Input Processing**: Use generated reports as input for selective processing
+4. **Drag-and-Drop Testing**: Test path input via drag-and-drop functionality
+5. **Error Handling**: Test with invalid paths, locked files, permission issues
 
 ## Future Enhancements
 
