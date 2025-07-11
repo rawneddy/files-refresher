@@ -447,16 +447,31 @@ class FileRefresher:
     
     def generate_csv_report(self, results, directory_path):
         """Generate comprehensive CSV report"""
-        # Generate report filename
+        # Generate report filename with version counter
         date_str = datetime.now().strftime('%Y.%m.%d')
         filename_pattern = self.report_settings.get('filename_pattern', 'file_refresh_report_{date}.csv')
-        report_filename = filename_pattern.format(date=date_str)
+        base_filename = filename_pattern.format(date=date_str)
         
         # Determine report location
         if self.report_settings.get('save_in_target_directory', True):
-            report_path = Path(directory_path) / report_filename
+            report_dir = Path(directory_path)
         else:
-            report_path = Path(report_filename)
+            report_dir = Path('.')
+        
+        # Find available filename with version counter
+        base_name = Path(base_filename).stem  # filename without extension
+        extension = Path(base_filename).suffix  # .csv
+        
+        counter = 0
+        report_path = report_dir / base_filename
+        
+        # If file exists, add two-digit counter after date
+        while report_path.exists():
+            counter += 1
+            # Insert counter after date: file_refresh_report_2025.07.11.01.csv
+            date_part = f"{date_str}.{counter:02d}"
+            versioned_filename = filename_pattern.format(date=date_part)
+            report_path = report_dir / versioned_filename
         
         try:
             with open(report_path, 'w', newline='', encoding='utf-8') as csvfile:
