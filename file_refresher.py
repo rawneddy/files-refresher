@@ -142,11 +142,22 @@ class FileRefresher:
         try:
             import tkinter as tk
             from tkinter import filedialog
+            import sys
+            import os
+            
+            # Suppress macOS NSWindow warnings
+            if sys.platform == 'darwin':
+                os.environ['TK_SILENCE_DEPRECATION'] = '1'
             
             # Create a hidden root window
             root = tk.Tk()
             root.withdraw()  # Hide the main window
-            root.attributes('-topmost', True)  # Bring dialog to front
+            
+            # Platform-specific window handling
+            if sys.platform == 'darwin':
+                root.call('wm', 'attributes', '.', '-topmost', '1')
+            else:
+                root.attributes('-topmost', True)
             
             # Open file dialog
             file_path = filedialog.askopenfilename(
@@ -169,11 +180,22 @@ class FileRefresher:
         try:
             import tkinter as tk
             from tkinter import filedialog
+            import sys
+            import os
+            
+            # Suppress macOS NSWindow warnings
+            if sys.platform == 'darwin':
+                os.environ['TK_SILENCE_DEPRECATION'] = '1'
             
             # Create a hidden root window
             root = tk.Tk()
             root.withdraw()  # Hide the main window
-            root.attributes('-topmost', True)  # Bring dialog to front
+            
+            # Platform-specific window handling
+            if sys.platform == 'darwin':
+                root.call('wm', 'attributes', '.', '-topmost', '1')
+            else:
+                root.attributes('-topmost', True)
             
             # Open directory dialog
             directory_path = filedialog.askdirectory(
@@ -237,9 +259,16 @@ class FileRefresher:
                     continue
             
             # Handle drag-and-drop path formatting
-            # Remove surrounding quotes and handle escaped spaces
-            csv_path = csv_path.strip().strip('"').strip("'")
-            csv_path = csv_path.replace('\\ ', ' ')  # Handle escaped spaces (common on macOS/Linux)
+            # Remove line breaks, surrounding quotes, and handle escaped characters
+            original_path = csv_path
+            csv_path = csv_path.replace('\n', '').replace('\r', '')  # Remove line breaks
+            csv_path = csv_path.strip().strip('"').strip("'")  # Remove quotes
+            csv_path = csv_path.replace('\\ ', ' ')  # Handle escaped spaces (macOS/Linux)
+            csv_path = csv_path.replace('\\~', '~')  # Handle escaped tildes
+            
+            # Debug output when path looks like it was drag-and-dropped
+            if original_path != csv_path and len(original_path) > 50:
+                self.console.print(f"\n[info]📋 Processed drag-and-drop path[/info]")
             
             path = Path(csv_path).expanduser().resolve()
             
@@ -316,9 +345,16 @@ class FileRefresher:
                     continue
             
             # Handle drag-and-drop path formatting
-            # Remove surrounding quotes and handle escaped spaces
-            directory = directory.strip().strip('"').strip("'")
-            directory = directory.replace('\\ ', ' ')  # Handle escaped spaces (common on macOS/Linux)
+            # Remove line breaks, surrounding quotes, and handle escaped characters
+            original_directory = directory
+            directory = directory.replace('\n', '').replace('\r', '')  # Remove line breaks
+            directory = directory.strip().strip('"').strip("'")  # Remove quotes
+            directory = directory.replace('\\ ', ' ')  # Handle escaped spaces (macOS/Linux)
+            directory = directory.replace('\\~', '~')  # Handle escaped tildes
+            
+            # Debug output when path looks like it was drag-and-dropped
+            if original_directory != directory and len(original_directory) > 50:
+                self.console.print(f"\n[info]📋 Processed drag-and-drop path[/info]")
             
             path = Path(directory).expanduser().resolve()
             
