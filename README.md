@@ -1,0 +1,188 @@
+# File Retention Refresher
+
+A Python application designed to bypass file retention policies by updating modification dates and intelligently renaming files with their original dates. Features a retro Apple II-style terminal interface.
+
+## 🚀 Quick Start
+
+### Windows Users
+1. Download the latest release from [Releases](../../releases)
+2. Extract the ZIP file to your desired location
+3. Double-click `file_refresher.exe` to run the interactive interface
+4. Follow the on-screen prompts
+
+### Mac/Linux Users
+```bash
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python3 file_refresher.py
+```
+
+## ✨ Features
+
+- **🔄 File Date Refresh**: Updates modification dates to bypass retention policies
+- **📅 Smart Renaming**: Preserves original dates in filenames (YYYY.MM.DD format)
+- **🖥️ Retro UI**: Apple II-style green terminal interface
+- **📊 CSV Reporting**: Detailed audit trails with versioned reports
+- **🎯 Selective Processing**: Process specific files via CSV input
+- **🔍 Dry-Run Mode**: Preview changes before making them
+- **⚙️ Configurable**: YAML configuration for file extensions and settings
+
+## 🎮 Interface Preview
+
+```
+╔═══════════════════════════════════════════════════╗
+║          FILE RETENTION REFRESHER v1.0            ║
+║              [ APPLE ][ STYLE ]                   ║
+╚═══════════════════════════════════════════════════╝
+
+> SELECT MODE [D/C]: D
+> SELECT DIRECTORY: /Users/documents/archive
+> OPERATION TYPE [P/R]: P
+
+PROCESSING FILES...
+[████████████████████░░░░░░░░░░░░░░░░░░░] 75%
+Currently: 2018.03.15 Budget Report.xlsx
+```
+
+## 🔧 Usage Modes
+
+### Interactive Mode (Recommended)
+```bash
+python3 file_refresher.py
+```
+- Guided wizard interface
+- Mode selection (Directory/CSV)
+- Operation type selection (Process/Report Only)
+- Real-time progress tracking
+
+### Command Line Mode
+```bash
+# Process directory
+python3 file_refresher.py /path/to/directory
+
+# Dry run (preview only)
+python3 file_refresher.py /path/to/directory --dry-run
+
+# Process specific files from CSV
+python3 file_refresher.py --csv-input report.csv
+
+# Non-interactive mode
+python3 file_refresher.py /path/to/directory --no-ui
+```
+
+## 📋 Workflow Examples
+
+### Basic File Refresh
+1. Run: `python3 file_refresher.py`
+2. Choose Directory mode
+3. Select your target folder
+4. Choose "Process Files"
+5. Confirm settings and proceed
+
+### Selective Processing
+1. Run with "Report Only" to generate CSV
+2. Edit CSV to keep only desired files
+3. Run with CSV input mode using edited file
+4. Review results
+
+## ⚙️ Configuration
+
+Edit `config.yaml` to customize:
+
+```yaml
+# File extensions to rename
+rename_extensions:
+  - .docx
+  - .xlsx
+  - .pdf
+  # Add your custom extensions
+
+# Age threshold for date updates
+days_threshold: 30
+
+# Report settings
+report:
+  filename_pattern: "file_refresh_report_{date}.csv"
+```
+
+## 📊 CSV Reports
+
+Every run generates a detailed CSV report with:
+- `new_path`: Full path after any renaming
+- `original_modified`: Original modification timestamp
+- `new_modified`: Updated modification timestamp
+- `extension`: File extension for filtering
+- `size_bytes`: File size for verification
+
+Reports use versioned naming: `report_2025.07.11.csv`, `report_2025.07.11.01.csv`, etc.
+
+## 🛡️ Safety Features
+
+- **No File Deletion**: Never removes files, only renames and updates dates
+- **Comprehensive Logging**: All operations logged to `file_refresher.log`
+- **Error Handling**: Graceful handling of permission issues and locked files
+- **Dry-Run Mode**: Preview all changes before execution
+- **Audit Trail**: Complete CSV reports for compliance
+
+## 🔨 Building from Source
+
+### For Windows Executable
+```bash
+# On Windows
+pip install pyinstaller
+python create_icon.py
+build_windows.bat
+```
+
+### For Development
+```bash
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+pip install -r requirements.txt
+python3 file_refresher.py
+```
+
+## 📚 Documentation
+
+- **[USER_GUIDE.md](USER_GUIDE.md)**: Comprehensive user manual
+- **[PROJECT_DESIGN.md](PROJECT_DESIGN.md)**: Technical specifications
+- **[BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)**: Executable creation guide
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Permission Denied Errors**
+- Run as administrator (Windows) or with sudo (Mac/Linux)
+- Check file ownership and permissions
+
+**Files Not Being Renamed**
+- Verify file extensions in `config.yaml`
+- Ensure files meet age threshold criteria
+
+**CSV Input Not Working**
+- Check CSV format matches output format exactly
+- Verify file paths are absolute
+
+### Getting Help
+1. Check the error messages and log file
+2. Review the [USER_GUIDE.md](USER_GUIDE.md)
+3. Ensure all dependencies are installed
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+**⚠️ Important**: This tool modifies file metadata. Always maintain backups of critical data before use.
