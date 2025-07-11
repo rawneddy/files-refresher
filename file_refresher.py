@@ -606,12 +606,19 @@ class FileRefresher:
             
             # Check if target already exists
             if new_path.exists():
-                error_msg = f"Target file already exists: {new_path}"
-                self.errors.append(error_msg)
-                logging.warning(error_msg)
-                if self.interactive:
-                    self.console.print(f"[warning]Target exists, skipping: {new_name}[/warning]")
-                return None
+                # Special case: if source and target are the same, file is already correctly named
+                if file_path.name == new_name:
+                    logging.info(f"File already correctly named: {file_path.name}")
+                    if self.interactive:
+                        self.console.print(f"[info]Already correctly named: {file_path.name}[/info]")
+                    return str(new_path)
+                else:
+                    error_msg = f"Target file already exists: {new_path}"
+                    self.errors.append(error_msg)
+                    logging.warning(error_msg)
+                    if self.interactive:
+                        self.console.print(f"[warning]Target exists, skipping: {new_name}[/warning]")
+                    return None
             
             # Check if filename is too long for filesystem
             if len(new_name) > 255:  # Most filesystems limit to 255 chars
@@ -917,7 +924,20 @@ class FileRefresher:
         
         # Show errors if any
         if self.errors:
-            self.console.print(f"\n[warning]⚠ {len(self.errors)} errors occurred (see file_refresher.log)[/warning]")
+            # Categorize warnings vs actual errors
+            target_exists_warnings = sum(1 for error in self.errors if "Target file already exists" in error)
+            other_errors = len(self.errors) - target_exists_warnings
+            
+            if target_exists_warnings > 0:
+                self.console.print(f"\n[info]ℹ {target_exists_warnings} files were skipped (already properly named)[/info]")
+                if other_errors > 0:
+                    self.console.print(f"[warning]⚠ {other_errors} other warnings occurred (see file_refresher.log)[/warning]")
+            else:
+                self.console.print(f"\n[warning]⚠ {len(self.errors)} warnings occurred (see file_refresher.log)[/warning]")
+            
+            if target_exists_warnings > 0:
+                self.console.print("\n[secondary]💡 Tip: Using an older CSV file may reference already-renamed files.[/secondary]")
+                self.console.print("[secondary]   Use a recent CSV report for best results.[/secondary]")
     
     def show_report_location(self, report_path):
         """Display report generation confirmation"""
