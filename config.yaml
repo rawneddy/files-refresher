@@ -9,6 +9,9 @@ rename_extensions:
   - .xls
   - .pptx
   - .ppt
+  # Microsoft Visio
+  - .vsdx
+  - .vsd
   # Documents
   - .pdf
   # Add custom extensions below
