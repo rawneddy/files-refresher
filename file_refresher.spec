@@ -1,7 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
-
 a = Analysis(
     ['file_refresher.py'],
     pathex=[],
@@ -11,14 +9,24 @@ a = Analysis(
         ('icon.ico', '.'),
     ],
     hiddenimports=[
-        'rich',
+        'rich.console',
+        'rich.progress',
+        'rich.panel',
+        'rich.table',
+        'rich.text',
+        'rich.align',
+        'rich.layout',
         'yaml',
         'csv',
-        'logging',
-        'datetime',
         'pathlib',
+        'datetime',
+        'logging',
+        're',
+        'argparse',
+        'os',
+        'sys',
+        'time',
         'collections',
-        'typing',
     ],
     hookspath=[],
     hooksconfig={},
@@ -27,22 +35,24 @@ a = Analysis(
         'tkinter',
         'matplotlib',
         'numpy',
-        'PIL.ImageTk',
-        'PIL.ImageWin',
+        'pandas',
+        'scipy',
+        'IPython',
+        'jupyter',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
+    cipher=None,
     noarchive=False,
+    optimize=0,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name='file_refresher',
@@ -54,8 +64,9 @@ exe = EXE(
     runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
+    argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.ico',
+    icon='icon.ico'
 )

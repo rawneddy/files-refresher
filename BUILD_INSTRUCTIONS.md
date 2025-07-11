@@ -1,317 +1,258 @@
 # Build Instructions - File Retention Refresher
 
 ## Overview
-This document explains how to build standalone executables for Windows and optionally for Mac. The Windows executable allows users to run the application without installing Python.
+This document explains how to build standalone executables for Windows and Mac. Both platforms now have automated build scripts that handle the entire process.
 
 ## Prerequisites
 
 ### For Building on Windows
-1. Python 3.9 or higher installed
+1. Python 3.10.2 or higher (required for PyInstaller compatibility)
 2. Git (optional, for cloning repository)
 
-### For Building on Mac (for Windows)
-1. Python 3.9 or higher installed
-2. Wine or a Windows VM (for true Windows executable)
-3. OR use GitHub Actions (recommended for cross-platform builds)
+### For Building on Mac
+1. Python 3.10.2 or higher (required for PyInstaller compatibility)
+2. Homebrew (recommended): `brew install python3`
 
 ## Building Windows Executable
 
-### Method 1: Direct Build on Windows
+### Automated Build (Recommended)
 
-1. **Clone or download the repository**
-   ```cmd
-   git clone [repository-url]
-   cd files-refresher
-   ```
-
-2. **Create virtual environment** (recommended)
-   ```cmd
-   python -m venv venv
-   venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```cmd
-   pip install -r requirements.txt
-   pip install pyinstaller
-   ```
-
-4. **Build the executable**
-   ```cmd
-   pyinstaller --onefile --name file_refresher --icon=icon.ico file_refresher.py
-   ```
-   
-   Or use the spec file (if provided):
-   ```cmd
-   pyinstaller file_refresher.spec
-   ```
-
-5. **Find your executable**
-   - Location: `dist/file_refresher.exe`
-   - Copy `config.yaml` to the same directory as the .exe
-
-### Method 2: Using Build Script
-
-Create `build_windows.bat`:
-```batch
-@echo off
-echo Building File Retention Refresher for Windows...
-
-REM Create virtual environment
-python -m venv build_env
-call build_env\Scripts\activate
-
-REM Install dependencies
-pip install -r requirements.txt
-pip install pyinstaller
-
-REM Build executable
-pyinstaller --onefile ^
-    --name file_refresher ^
-    --add-data "config.yaml;." ^
-    --distpath ./dist ^
-    --workpath ./build ^
-    --specpath ./build ^
-    --noconfirm ^
-    --clean ^
-    file_refresher.py
-
-echo.
-echo Build complete! Executable located in: dist\file_refresher.exe
-pause
-```
-
-Then simply run:
 ```cmd
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+
+# Run the automated build script
 build_windows.bat
 ```
 
-## Building from Mac (Cross-Platform)
+The script will:
+1. Check Python version compatibility
+2. Create a clean virtual environment
+3. Install all dependencies
+4. Generate the application icon
+5. Build the executable using PyInstaller
+6. Package everything in `dist\windows\`
 
-### Method 1: Using GitHub Actions (Recommended)
+**Output**: `dist\windows\file_refresher.exe` with all necessary files
 
-Create `.github/workflows/build.yml`:
-```yaml
-name: Build Executables
+### Manual Build
 
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+```cmd
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
 
-jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-    
-    - name: Build executable
-      run: |
-        pyinstaller --onefile --name file_refresher file_refresher.py
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: windows-executable
-        path: dist/file_refresher.exe
+# Create virtual environment
+python -m venv build_env
+build_env\Scripts\activate
 
-  build-mac:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-    
-    - name: Build executable
-      run: |
-        pyinstaller --onefile --name file_refresher file_refresher.py
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: mac-executable
-        path: dist/file_refresher
+# Install dependencies
+pip install -r requirements.txt
+
+# Generate icon
+python create_icon.py
+
+# Build executable
+pyinstaller file_refresher.spec --noconfirm
+
+# Package distribution
+mkdir dist\windows
+copy dist\file_refresher.exe dist\windows\
+copy config.yaml dist\windows\
+copy README.md dist\windows\
+copy USER_GUIDE.md dist\windows\
 ```
 
-### Method 2: Local Mac Build (Mac executable only)
+## Building Mac Executable
 
-1. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   pip install pyinstaller
-   ```
+### Automated Build (Recommended)
 
-2. **Build Mac executable**
-   ```bash
-   pyinstaller --onefile --name file_refresher file_refresher.py
-   ```
-
-3. **Make it executable**
-   ```bash
-   chmod +x dist/file_refresher
-   ```
-
-## PyInstaller Specification File
-
-Create `file_refresher.spec` for more control:
-```python
-# -*- mode: python ; coding: utf-8 -*-
-
-block_cipher = None
-
-a = Analysis(
-    ['file_refresher.py'],
-    pathex=[],
-    binaries=[],
-    datas=[('config.yaml', '.')],
-    hiddenimports=['rich', 'yaml'],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='file_refresher',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=True,
-    disable_windowed_traceback=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-```
-
-## Development Workflow
-
-### For Developers on Mac
-
-1. **Develop and test on Mac**
-   ```bash
-   python file_refresher.py
-   ```
-
-2. **Push to GitHub**
-   ```bash
-   git add .
-   git commit -m "Feature update"
-   git push
-   ```
-
-3. **Create release tag** (triggers build)
-   ```bash
-   git tag v1.0.0
-   git push --tags
-   ```
-
-4. **Download Windows executable** from GitHub Actions artifacts
-
-### For End Users
-
-#### Windows Users
-1. Download `file_refresher.exe` from releases
-2. Download `config.yaml` 
-3. Place both in same directory
-4. Double-click exe or run from command prompt
-
-#### Mac/Linux Users
 ```bash
-# No build needed - run directly
-python file_refresher.py
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+
+# Run the automated build script
+./build_mac.sh
+```
+
+The script will:
+1. Check Python version compatibility (blocks 3.10.0 and 3.10.1)
+2. Create a clean virtual environment
+3. Install all dependencies
+4. Generate the application icon
+5. Build the executable using PyInstaller
+6. Package everything in `dist/mac/`
+
+**Output**: `dist/mac/file_refresher` with all necessary files
+
+### Manual Build
+
+```bash
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+
+# Create virtual environment
+python3 -m venv build_env
+source build_env/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Generate icon
+python create_icon.py
+
+# Build executable
+pyinstaller file_refresher.spec --noconfirm
+
+# Package distribution
+mkdir -p dist/mac
+cp dist/file_refresher dist/mac/
+cp config.yaml dist/mac/
+cp README.md dist/mac/
+cp USER_GUIDE.md dist/mac/
+chmod +x dist/mac/file_refresher
+```
+
+## Running the Built Executables
+
+### Windows
+```cmd
+cd dist\windows
+
+# Option 1: Double-click file_refresher.exe in File Explorer
+# Option 2: Run from command prompt
+file_refresher.exe
+
+# With arguments
+file_refresher.exe --help
+file_refresher.exe C:\path\to\directory --dry-run
+```
+
+### Mac
+```bash
+cd dist/mac
+
+# Must run from terminal (double-click not supported)
+./file_refresher
+
+# With arguments
+./file_refresher --help
+./file_refresher /path/to/directory --dry-run
+```
+
+## Testing Your Build
+
+### Generate Test Files
+```bash
+# Create sample files for testing
+python3 create_test_files.py
+
+# This creates test_files/ with:
+# - Files of different ages (5-500 days old)
+# - Various extensions (.docx, .xlsx, .pdf, .txt, etc.)
+# - Files with existing date prefixes
+# - Files needing format conversion
+```
+
+### Test the Application
+```bash
+# Test with the generated files
+./dist/mac/file_refresher test_files --dry-run
+
+# On Windows:
+dist\windows\file_refresher.exe test_files --dry-run
 ```
 
 ## Troubleshooting
 
-### Common Build Issues
+### Python Version Issues
+**Error**: `Python 3.10.0 has a known PyInstaller compatibility issue`
 
-1. **"Module not found" errors**
-   - Add to hiddenimports in .spec file
-   - Example: `hiddenimports=['rich', 'yaml', 'csv']`
+**Solution**: 
+```bash
+# Upgrade Python using Homebrew (Mac)
+brew install python3
 
-2. **Antivirus warnings**
-   - Common with PyInstaller
-   - Sign the executable or add to whitelist
-
-3. **Large executable size**
-   - Normal for Python executables (includes interpreter)
-   - Use UPX compression: `--upx-dir=/path/to/upx`
-
-4. **Config file not found**
-   - Use `--add-data` flag to bundle
-   - Or document that users need to copy it manually
-
-### Testing the Executable
-
-1. **Test on clean Windows system**
-   - No Python installed
-   - Different Windows versions
-
-2. **Test all features**
-   - Directory mode
-   - CSV mode
-   - Config file reading
-   - Report generation
-
-## Distribution Package
-
-Create a release package:
+# Or install specific version
+brew install python@3.12
 ```
-file_refresher_v1.0.0_windows.zip
+
+### Build Script Fails
+1. **Check Python version**: Must be 3.10.2 or higher
+2. **Clean previous builds**: Delete `build_env/`, `dist/`, `build/`
+3. **Check permissions**: Ensure write access to project directory
+4. **Internet connection**: Required for downloading dependencies
+
+### Common PyInstaller Issues
+
+**Missing modules**:
+- Already handled in `file_refresher.spec` with `hiddenimports`
+
+**Large executable size**:
+- Normal for Python apps (includes interpreter)
+- Current size: ~18MB
+
+**Antivirus warnings**:
+- Common with PyInstaller executables
+- Add to antivirus whitelist if needed
+
+### Performance
+- **Build time**: 2-5 minutes depending on system
+- **Executable size**: ~18MB (includes Python runtime)
+- **Memory usage**: ~50MB when running
+
+## Distribution
+
+### Create Release Package
+
+**Windows**:
+```
+file_refresher_windows_v1.0.zip
 ├── file_refresher.exe
-├── config.yaml
-├── README.txt
-└── sample_report.csv
+├── config.yaml  
+├── README.md
+└── USER_GUIDE.md
 ```
 
-## Alternative: Python Embedded Distribution
+**Mac**:
+```
+file_refresher_mac_v1.0.zip
+├── file_refresher
+├── config.yaml
+├── README.md
+└── USER_GUIDE.md
+```
 
-For users who prefer not to use executables:
+### File Structure After Build
 
-1. Download Python embedded distribution
-2. Extract to folder
-3. Add packages: `python.exe -m pip install rich pyyaml`
-4. Create batch file to run:
-   ```batch
-   @echo off
-   python.exe file_refresher.py %*
-   ```
+```
+project/
+├── dist/
+│   ├── windows/
+│   │   ├── file_refresher.exe
+│   │   ├── config.yaml
+│   │   ├── README.md
+│   │   └── USER_GUIDE.md
+│   └── mac/
+│       ├── file_refresher
+│       ├── config.yaml
+│       ├── README.md
+│       └── USER_GUIDE.md
+├── build/          (temporary files - can delete)
+├── build_env/      (virtual environment - can delete)
+└── file_refresher.spec
+```
 
-This provides a portable Python environment without system installation.
+## Development Workflow
+
+1. **Develop**: Edit source files
+2. **Test**: `python3 file_refresher.py`
+3. **Build**: Run build script
+4. **Test Build**: Run executable with test files
+5. **Package**: Create distribution ZIP
+6. **Release**: Tag version and publish
+
+For continuous development, you only need to rebuild when making releases.

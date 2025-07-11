@@ -78,3 +78,7 @@ temp/
 
 # Keep the icon file
 !icon.ico
+
+# Legacy build folders (use dist/ instead)
+file_refresher_mac/
+file_refresher_windows/

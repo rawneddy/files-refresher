@@ -23,24 +23,37 @@ The tool features a retro Apple II-style interface and supports both bulk direct
 
 ## Installation
 
-### Windows (Using Executable)
-1. Download `file_refresher.exe` from the releases
-2. Place it in a convenient location
-3. Copy the `config.yaml` file to the same directory
-4. Run from command prompt or double-click
-
-### Mac/Linux (Python)
-```bash
+### Windows (Build Executable)
+```cmd
 # Clone the repository
-git clone [repository-url]
+git clone https://github.com/rawneddy/files-refresher.git
 cd files-refresher
 
-# Install dependencies
-pip install -r requirements.txt
+# Build the executable
+build_windows.bat
 
-# Run the application
-python file_refresher.py
+# Run the application (can double-click or use command prompt)
+cd dist\windows
+file_refresher.exe
 ```
+
+### Mac/Linux
+```bash
+# Clone the repository
+git clone https://github.com/rawneddy/files-refresher.git
+cd files-refresher
+
+# Option 1: Run with Python (Recommended)
+pip install -r requirements.txt
+python3 file_refresher.py
+
+# Option 2: Build executable (requires Python 3.10.2+)
+./build_mac.sh
+cd dist/mac
+./file_refresher
+```
+
+**Note**: Mac executables must be run from terminal - double-clicking is not supported.
 
 ## Quick Start
 

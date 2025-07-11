@@ -13,8 +13,9 @@ cd files-refresher
 # Build Windows executable
 build_windows.bat
 
-# Run the executable
-file_refresher_windows\file_refresher.exe
+# Run the executable (can double-click or use command prompt)
+cd dist\windows
+file_refresher.exe
 ```
 
 ### Mac/Linux Users
@@ -23,14 +24,19 @@ file_refresher_windows\file_refresher.exe
 git clone https://github.com/rawneddy/files-refresher.git
 cd files-refresher
 
-# Option 1: Run directly with Python
+# Option 1: Run directly with Python (Recommended)
 pip install -r requirements.txt
 python3 file_refresher.py
 
-# Option 2: Build executable
+# Option 2: Build executable (if PyInstaller compatible)
 ./build_mac.sh
-file_refresher_mac/file_refresher
+
+# Run the executable (terminal required)
+cd dist/mac
+./file_refresher
 ```
+
+> **Note**: Some macOS systems may have PyInstaller compatibility issues. If the build fails, use Option 1 to run directly with Python.
 
 > **Note**: Pre-built releases will be available in the future. For now, please build locally using the instructions above.
 
@@ -171,6 +177,22 @@ pip install -r requirements.txt
 python3 file_refresher.py
 ```
 
+### Testing
+```bash
+# Generate test files for development/testing
+python3 create_test_files.py
+
+# This creates a test_files/ directory with:
+# - Files of different ages (5-500 days old)
+# - Various file types (.docx, .xlsx, .pdf, .txt, .csv, .png)
+# - Files with existing date prefixes (2019.06.15 format)
+# - Files needing date conversion (YYYY-MM-DD to YYYY.MM.DD)
+# - Recent files that shouldn't be modified
+
+# Test the application with generated files
+python3 file_refresher.py test_files --dry-run
+```
+
 ## 📚 Documentation
 
 - **[USER_GUIDE.md](USER_GUIDE.md)**: Comprehensive user manual
@@ -192,6 +214,11 @@ python3 file_refresher.py
 **CSV Input Not Working**
 - Check CSV format matches output format exactly
 - Verify file paths are absolute
+
+**PyInstaller Build Fails on Mac**
+- This is a known compatibility issue with Python 3.10.0 and 3.10.1
+- Solution: Upgrade to Python 3.10.2+ using: `brew install python3`
+- Workaround: Run directly with Python: `pip install -r requirements.txt && python3 file_refresher.py`
 
 ### Getting Help
 1. Check the error messages and log file

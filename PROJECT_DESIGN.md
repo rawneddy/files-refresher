@@ -13,13 +13,14 @@ A cross-platform tool for updating file modification dates and intelligently ren
 ## Technical Architecture
 
 ### Technology Stack
-- **Language**: Python 3.9+
+- **Language**: Python 3.10.2+ (PyInstaller compatibility requirement)
 - **UI Framework**: Rich (for retro terminal interface)
 - **Configuration**: YAML (PyYAML)
 - **CSV Processing**: Python csv module
 - **File Operations**: os, pathlib, shutil
 - **Date/Time**: datetime
-- **Packaging**: PyInstaller (for Windows executable)
+- **Packaging**: PyInstaller (for Windows and Mac executables)
+- **Icon Generation**: Pillow (for .ico creation)
 
 ### Project Structure
 ```
@@ -27,14 +28,25 @@ files-refresher/
 ├── file_refresher.py      # Main application
 ├── config.yaml            # User configuration
 ├── requirements.txt       # Python dependencies
+├── create_test_files.py   # Test file generator
+├── create_icon.py        # Icon generation script
+├── file_refresher.spec   # PyInstaller configuration
+├── build_windows.bat     # Windows build script
+├── build_mac.sh          # Mac build script
+├── icon.ico              # Application icon (generated)
+├── icon.png              # Icon preview (generated)
 ├── README.md             # User documentation
 ├── PROJECT_DESIGN.md     # This file
-├── CLAUDE.md            # AI context file
-├── USER_GUIDE.md        # Detailed user guide
+├── CLAUDE.md             # AI context file
+├── USER_GUIDE.md         # Detailed user guide
 ├── BUILD_INSTRUCTIONS.md # How to create executables
-├── build_windows.bat    # Windows build script
-├── file_refresher.spec  # PyInstaller configuration
-└── dist/                # Windows executable output
+├── .gitignore            # Git ignore patterns
+├── dist/                 # Build outputs (gitignored)
+│   ├── windows/          # Windows executable + files
+│   └── mac/              # Mac executable + files
+├── build/                # PyInstaller temp files (gitignored)
+├── build_env/            # Virtual environment (gitignored)
+└── test_files/           # Generated test files (gitignored)
 ```
 
 ## Feature Specifications

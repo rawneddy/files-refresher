@@ -55,19 +55,19 @@ if errorlevel 1 (
 )
 
 echo [6/6] Packaging distribution...
-if exist file_refresher_windows rmdir /s /q file_refresher_windows
-mkdir file_refresher_windows
-copy dist\file_refresher.exe file_refresher_windows\
-copy config.yaml file_refresher_windows\
-copy README.md file_refresher_windows\
-copy USER_GUIDE.md file_refresher_windows\
+if exist dist\windows rmdir /s /q dist\windows
+mkdir dist\windows
+copy dist\file_refresher.exe dist\windows\
+copy config.yaml dist\windows\
+copy README.md dist\windows\
+copy USER_GUIDE.md dist\windows\
 
 echo.
 echo ===============================================
 echo BUILD COMPLETE!
 echo ===============================================
 echo.
-echo Executable created: file_refresher_windows\file_refresher.exe
+echo Executable created: dist\windows\file_refresher.exe
 echo.
 echo Distribution package contents:
 echo - file_refresher.exe (main executable)
@@ -75,7 +75,7 @@ echo - config.yaml (configuration file)
 echo - README.md (quick start guide)
 echo - USER_GUIDE.md (detailed documentation)
 echo.
-echo You can now distribute the 'file_refresher_windows' folder
+echo You can now distribute the 'dist\windows' folder
 echo or create a ZIP file for easy sharing.
 echo.
 pause
