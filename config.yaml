@@ -1,0 +1,33 @@
+# File Retention Refresher Configuration
+
+# Extensions to rename (add date prefix)
+rename_extensions:
+  # Microsoft Office
+  - .docx
+  - .doc
+  - .xlsx
+  - .xls
+  - .pptx
+  - .ppt
+  # Documents
+  - .pdf
+  # Add custom extensions below
+  # - .dwg
+  # - .txt
+
+# Update modification date for files older than this many days
+days_threshold: 30
+
+# Report settings
+report:
+  # {date} will be replaced with YYYY.MM.DD
+  filename_pattern: "file_refresh_report_{date}.csv"
+  # Save report in same directory as processed files
+  save_in_target_directory: true
+
+# UI settings
+ui:
+  # Retro color theme
+  primary_color: "#33FF33"
+  # Show detailed file info during processing
+  verbose_progress: true
