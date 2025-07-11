@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-File Retention Refresher
+File Retention Refresher with Retro UI
 Updates file modification dates and renames files with original dates
 """
 
@@ -11,14 +11,43 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
+import time
+from typing import Optional, List, Dict, Tuple
+from collections import defaultdict
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich.prompt import Prompt, Confirm
+from rich.text import Text
+from rich.align import Align
+from rich.box import DOUBLE, HEAVY, ASCII
+from rich.theme import Theme
+from rich.style import Style
+
+# Define retro green theme
+RETRO_THEME = Theme({
+    "primary": "bright_green",
+    "secondary": "green",
+    "accent": "bright_white",
+    "error": "bright_red",
+    "warning": "yellow",
+    "info": "cyan",
+    "border": "#33FF33",
+    "title": "bold bright_green",
+    "prompt": "bright_green"
+})
 
 class FileRefresher:
-    def __init__(self, config_path="config.yaml"):
+    def __init__(self, config_path="config.yaml", interactive=True):
         self.config = self._load_config(config_path)
         self.rename_extensions = [ext.lower() for ext in self.config.get('rename_extensions', [])]
         self.days_threshold = self.config.get('days_threshold', 30)
         self.report_settings = self.config.get('report', {})
         self.processed_files = []
+        self.interactive = interactive
+        self.console = Console(theme=RETRO_THEME, force_terminal=True)
         
         # Date patterns
         self.date_pattern_dots = re.compile(r'^(\d{4})\.(\d{2})\.(\d{2})\s+(.+)$')
@@ -30,10 +59,12 @@ class FileRefresher:
             with open(config_path, 'r') as f:
                 return yaml.safe_load(f)
         except FileNotFoundError:
-            print(f"Warning: {config_path} not found. Using default settings.")
+            if self.interactive:
+                self.console.print(f"[warning]Warning: {config_path} not found. Using default settings.[/warning]")
             return self._get_default_config()
         except Exception as e:
-            print(f"Error loading config: {e}. Using default settings.")
+            if self.interactive:
+                self.console.print(f"[error]Error loading config: {e}. Using default settings.[/error]")
             return self._get_default_config()
     
     def _get_default_config(self):
@@ -47,6 +78,93 @@ class FileRefresher:
             }
         }
     
+    def show_welcome_screen(self):
+        """Display retro welcome screen"""
+        self.console.clear()
+        
+        # ASCII Art Logo
+        logo = """
+╔═══════════════════════════════════════════════════╗
+║          FILE RETENTION REFRESHER v1.0            ║
+║              [ APPLE ][ STYLE ]                   ║
+╚═══════════════════════════════════════════════════╝
+"""
+        
+        self.console.print(logo, style="primary", justify="center")
+        self.console.print("\n")
+        self.console.print("Bypass retention policies by refreshing file dates", style="secondary", justify="center")
+        self.console.print("and preserving original dates in filenames", style="secondary", justify="center")
+        self.console.print("\n")
+        
+        # Blinking cursor effect
+        with self.console.status("[primary]Press ENTER to continue...[/primary]", spinner="dots"):
+            input()
+    
+    def get_directory_input(self) -> str:
+        """Get directory path from user with validation"""
+        self.console.print("\n[primary]DIRECTORY SELECTION[/primary]")
+        self.console.print("─" * 50, style="border")
+        
+        while True:
+            directory = Prompt.ask(
+                "\n[prompt]> SELECT DIRECTORY[/prompt]",
+                default=os.getcwd()
+            )
+            
+            path = Path(directory).expanduser().resolve()
+            
+            if path.exists() and path.is_dir():
+                self.console.print(f"\n[info]✓ Directory confirmed: {path}[/info]")
+                return str(path)
+            else:
+                self.console.print(f"\n[error]✗ Invalid directory: {directory}[/error]")
+                self.console.print("[warning]Please enter a valid directory path[/warning]")
+    
+    def show_config_review(self):
+        """Display configuration review screen"""
+        self.console.print("\n[primary]CONFIGURATION REVIEW:[/primary]")
+        self.console.print("─" * 50, style="border")
+        
+        # Create extensions table
+        table = Table(
+            title="RENAME SETTINGS",
+            box=ASCII,
+            style="primary",
+            title_style="title",
+            border_style="border"
+        )
+        
+        table.add_column("Extension", style="accent")
+        table.add_column("File Type", style="secondary")
+        
+        # Extension descriptions
+        ext_descriptions = {
+            '.docx': 'Word Documents',
+            '.doc': 'Legacy Word',
+            '.xlsx': 'Excel Spreadsheets',
+            '.xls': 'Legacy Excel',
+            '.pptx': 'PowerPoint Presentations',
+            '.ppt': 'Legacy PowerPoint',
+            '.pdf': 'PDF Documents'
+        }
+        
+        for ext in self.rename_extensions:
+            desc = ext_descriptions.get(ext, 'Custom File Type')
+            table.add_row(f"✓ {ext}", desc)
+        
+        self.console.print("\n")
+        self.console.print(table)
+        
+        self.console.print(f"\n[primary]MODIFICATION DATE UPDATE:[/primary]")
+        self.console.print(f"├─ ALL files older than [accent]{self.days_threshold} days[/accent]")
+        self.console.print(f"└─ Will be updated to: [accent]{datetime.now().strftime('%Y.%m.%d')}[/accent]")
+        
+        self.console.print("\n[info][ To modify these settings, edit config.yaml ][/info]")
+        
+        if not Confirm.ask("\n[prompt]CONTINUE WITH THESE SETTINGS?[/prompt]", default=True):
+            self.console.print("\n[warning]Operation cancelled by user[/warning]")
+            sys.exit(0)
+    
     def scan_directory(self, directory_path, recursive=True):
         """Scan directory and return list of files with metadata"""
         files = []
@@ -58,23 +176,85 @@ class FileRefresher:
         if not path.is_dir():
             raise ValueError(f"Path is not a directory: {directory_path}")
         
-        # Use glob pattern for recursive or non-recursive search
-        pattern = "**/*" if recursive else "*"
+        # Show scanning progress
+        with self.console.status("[primary]SCANNING DIRECTORY...[/primary]", spinner="dots"):
+            # Use glob pattern for recursive or non-recursive search
+            pattern = "**/*" if recursive else "*"
+            
+            for file_path in path.glob(pattern):
+                if file_path.is_file():
+                    try:
+                        stat = file_path.stat()
+                        files.append({
+                            'path': file_path,
+                            'size': stat.st_size,
+                            'modified': datetime.fromtimestamp(stat.st_mtime),
+                            'extension': file_path.suffix.lower()
+                        })
+                    except Exception as e:
+                        self.console.print(f"[error]Error reading file {file_path}: {e}[/error]")
         
-        for file_path in path.glob(pattern):
-            if file_path.is_file():
-                try:
-                    stat = file_path.stat()
-                    files.append({
-                        'path': file_path,
-                        'size': stat.st_size,
-                        'modified': datetime.fromtimestamp(stat.st_mtime),
-                        'extension': file_path.suffix.lower()
-                    })
-                except Exception as e:
-                    print(f"Error reading file {file_path}: {e}")
-                    
         return files
+    
+    def show_pre_scan_summary(self, files: List[Dict]) -> bool:
+        """Display pre-scan summary and get confirmation"""
+        # Categorize files
+        stats = defaultdict(int)
+        already_dated_dots = 0
+        already_dated_hyphens = 0
+        will_rename = 0
+        will_update_date = 0
+        
+        for file_info in files:
+            filename = file_info['path'].name
+            ext = file_info['extension']
+            
+            # Count by extension
+            stats[ext] += 1
+            
+            # Check date patterns
+            if self.date_pattern_dots.match(filename):
+                already_dated_dots += 1
+            elif self.date_pattern_hyphens.match(filename):
+                already_dated_hyphens += 1
+                if ext in self.rename_extensions:
+                    will_rename += 1
+            elif ext in self.rename_extensions:
+                will_rename += 1
+            
+            # Check if needs date update
+            if self.needs_date_update(file_info):
+                will_update_date += 1
+        
+        # Display summary table
+        self.console.print("\n[primary]FILE TYPE SUMMARY:[/primary]")
+        
+        table = Table(box=ASCII, style="primary", border_style="border")
+        table.add_column("File Type", style="accent")
+        table.add_column("Count", justify="right", style="secondary")
+        
+        # Add common file types
+        common_exts = ['.docx', '.xlsx', '.pptx', '.pdf', '.doc', '.xls', '.ppt']
+        for ext in common_exts:
+            if stats[ext] > 0:
+                table.add_row(f"{ext.upper()[1:]} Files ({ext})", str(stats[ext]))
+        
+        # Add other extensions
+        for ext, count in sorted(stats.items()):
+            if ext not in common_exts and count > 0:
+                table.add_row(f"Other ({ext})", str(count))
+        
+        self.console.print(table)
+        
+        # Summary statistics
+        self.console.print("\n[primary]PROCESSING SUMMARY:[/primary]")
+        self.console.print(f"├─ Files already dated (YYYY.MM.DD): [accent]{already_dated_dots}[/accent]")
+        self.console.print(f"├─ Files already dated (YYYY-MM-DD): [accent]{already_dated_hyphens}[/accent]")
+        self.console.print(f"├─ Files to rename: [accent]{will_rename}[/accent]")
+        self.console.print(f"├─ Dates to update: [accent]{will_update_date}[/accent]")
+        self.console.print(f"└─ TOTAL FILES: [accent]{len(files)}[/accent]")
+        
+        return Confirm.ask("\n[prompt]PROCEED WITH FILE PROCESSING?[/prompt]", default=True)
     
     def needs_date_update(self, file_info):
         """Check if file modification date needs updating"""
@@ -131,7 +311,8 @@ class FileRefresher:
             os.utime(file_path, (timestamp, timestamp))
             return True
         except Exception as e:
-            print(f"Error updating date for {file_path}: {e}")
+            if self.interactive:
+                self.console.print(f"[error]Error updating date for {file_path}: {e}[/error]")
             return False
     
     def rename_file(self, file_path, new_name):
@@ -141,7 +322,8 @@ class FileRefresher:
             file_path.rename(new_path)
             return new_path
         except Exception as e:
-            print(f"Error renaming {file_path}: {e}")
+            if self.interactive:
+                self.console.print(f"[error]Error renaming {file_path}: {e}[/error]")
             return None
     
     def process_file(self, file_info):
@@ -176,19 +358,67 @@ class FileRefresher:
         
         return result
     
-    def process_directory(self, directory_path):
-        """Process all files in directory"""
-        print(f"Scanning directory: {directory_path}")
+    def process_directory_with_progress(self, directory_path):
+        """Process all files in directory with progress display"""
+        self.console.print(f"\n[primary]SCANNING DIRECTORY...[/primary]")
         files = self.scan_directory(directory_path)
-        print(f"Found {len(files)} files")
+        
+        if not self.show_pre_scan_summary(files):
+            self.console.print("\n[warning]Operation cancelled by user[/warning]")
+            return []
+        
+        self.console.print("\n[primary]PROCESSING FILES...[/primary]\n")
         
         results = []
-        for i, file_info in enumerate(files):
-            print(f"Processing {i+1}/{len(files)}: {file_info['path'].name}")
-            result = self.process_file(file_info)
-            results.append(result)
+        
+        # Create progress bar
+        with Progress(
+            SpinnerColumn(style="primary"),
+            TextColumn("[primary]{task.description}[/primary]"),
+            BarColumn(complete_style="primary", finished_style="secondary"),
+            TextColumn("[accent]{task.percentage:>3.0f}%[/accent]"),
+            TimeRemainingColumn(),
+            console=self.console
+        ) as progress:
+            
+            task = progress.add_task("Processing", total=len(files))
+            
+            for i, file_info in enumerate(files):
+                # Update progress description
+                progress.update(
+                    task, 
+                    description=f"[{i+1}/{len(files)}] {file_info['path'].name[:50]}...",
+                    advance=1
+                )
+                
+                result = self.process_file(file_info)
+                results.append(result)
         
         return results
+    
+    def show_completion_summary(self, results):
+        """Display completion summary"""
+        renamed_count = sum(1 for r in results if r['renamed'])
+        updated_count = sum(1 for r in results if r['date_updated'])
+        
+        self.console.print("\n[primary]╔═══════════════════════════════════════╗[/primary]")
+        self.console.print("[primary]║        PROCESSING COMPLETE!           ║[/primary]")
+        self.console.print("[primary]╚═══════════════════════════════════════╝[/primary]")
+        
+        summary_table = Table(box=None, show_header=False, style="secondary")
+        summary_table.add_column("Label", style="accent")
+        summary_table.add_column("Value", justify="right", style="primary")
+        
+        summary_table.add_row("Files Processed:", str(len(results)))
+        summary_table.add_row("Files Renamed:", str(renamed_count))
+        summary_table.add_row("Dates Updated:", str(updated_count))
+        
+        self.console.print("\n", summary_table)
+        
+        if renamed_count > 0 or updated_count > 0:
+            self.console.print("\n[info]✓ All operations completed successfully![/info]")
+        else:
+            self.console.print("\n[warning]No files required processing[/warning]")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -197,8 +427,7 @@ def main():
     parser.add_argument(
         'directory',
         nargs='?',
-        default='.',
-        help='Directory to process (default: current directory)'
+        help='Directory to process (interactive mode if not provided)'
     )
     parser.add_argument(
         '--config',
@@ -206,31 +435,56 @@ def main():
         help='Path to configuration file (default: config.yaml)'
     )
     parser.add_argument(
-        '--dry-run',
+        '--no-ui',
         action='store_true',
-        help='Preview changes without making them'
+        help='Run without interactive UI'
     )
     
     args = parser.parse_args()
     
     # Initialize refresher
-    refresher = FileRefresher(args.config)
+    interactive = not args.no_ui and not args.directory
+    refresher = FileRefresher(args.config, interactive=interactive)
     
     try:
-        # Process directory
-        results = refresher.process_directory(args.directory)
+        if interactive:
+            # Interactive mode with retro UI
+            refresher.show_welcome_screen()
+            directory = refresher.get_directory_input()
+            refresher.show_config_review()
+            results = refresher.process_directory_with_progress(directory)
+            refresher.show_completion_summary(results)
+        else:
+            # Command line mode (backward compatibility)
+            directory = args.directory or '.'
+            # Use simplified processing for command line mode
+            refresher.interactive = False
+            files = refresher.scan_directory(directory)
+            results = []
+            for file_info in files:
+                result = refresher.process_file(file_info)
+                results.append(result)
+            
+            # Summary
+            renamed_count = sum(1 for r in results if r['renamed'])
+            updated_count = sum(1 for r in results if r['date_updated'])
+            
+            print(f"\nSummary:")
+            print(f"Files processed: {len(results)}")
+            print(f"Files renamed: {renamed_count}")
+            print(f"Dates updated: {updated_count}")
         
-        # Summary
-        renamed_count = sum(1 for r in results if r['renamed'])
-        updated_count = sum(1 for r in results if r['date_updated'])
-        
-        print(f"\nSummary:")
-        print(f"Files processed: {len(results)}")
-        print(f"Files renamed: {renamed_count}")
-        print(f"Dates updated: {updated_count}")
-        
+    except KeyboardInterrupt:
+        if interactive:
+            refresher.console.print("\n\n[warning]Operation cancelled by user[/warning]")
+        else:
+            print("\nOperation cancelled by user")
+        sys.exit(1)
     except Exception as e:
-        print(f"Error: {e}")
+        if interactive:
+            refresher.console.print(f"\n[error]Error: {e}[/error]")
+        else:
+            print(f"Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
