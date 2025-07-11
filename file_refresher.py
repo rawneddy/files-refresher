@@ -51,6 +51,7 @@ class FileRefresher:
         self.interactive = interactive
         self.console = Console(theme=RETRO_THEME, force_terminal=True)
         self.errors = []
+        self.dry_run = False
         self.setup_logging()
         
         # Date patterns
@@ -114,6 +115,91 @@ class FileRefresher:
         # Blinking cursor effect
         with self.console.status("[primary]Press ENTER to continue...[/primary]", spinner="dots"):
             input()
+    
+    def get_mode_selection(self) -> str:
+        """Get user selection for operation mode"""
+        self.console.print("\n[primary]MODE SELECTION[/primary]")
+        self.console.print("─" * 50, style="border")
+        
+        self.console.print("\n[accent]Choose operation mode:[/accent]")
+        self.console.print("[secondary]D[/secondary] - Directory Mode: Process all files in a directory")
+        self.console.print("[secondary]C[/secondary] - CSV Input Mode: Process only files listed in CSV")
+        
+        while True:
+            choice = Prompt.ask("\n[prompt]> SELECT MODE [D/C][/prompt]", choices=["D", "C", "d", "c"], default="D")
+            return choice.upper()
+    
+    def get_operation_type(self) -> str:
+        """Get user selection for operation type (Directory mode only)"""
+        self.console.print("\n[primary]OPERATION TYPE[/primary]")
+        self.console.print("─" * 50, style="border")
+        
+        self.console.print("\n[accent]Choose operation type:[/accent]")
+        self.console.print("[secondary]P[/secondary] - Process Files: Make actual changes to files")
+        self.console.print("[secondary]R[/secondary] - Report Only: Generate CSV report without making changes (dry run)")
+        
+        while True:
+            choice = Prompt.ask("\n[prompt]> OPERATION TYPE [P/R][/prompt]", choices=["P", "R", "p", "r"], default="P")
+            return choice.upper()
+    
+    def get_csv_input(self) -> str:
+        """Get CSV input file path with validation"""
+        self.console.print("\n[primary]CSV INPUT SELECTION[/primary]")
+        self.console.print("─" * 50, style="border")
+        
+        while True:
+            csv_path = Prompt.ask("\n[prompt]> CSV INPUT FILE[/prompt]")
+            
+            path = Path(csv_path).expanduser().resolve()
+            
+            if not path.exists():
+                self.console.print(f"\n[error]✗ File not found: {csv_path}[/error]")
+                continue
+            
+            if not path.is_file():
+                self.console.print(f"\n[error]✗ Not a file: {csv_path}[/error]")
+                continue
+            
+            if path.suffix.lower() != '.csv':
+                self.console.print(f"\n[error]✗ Not a CSV file: {csv_path}[/error]")
+                continue
+            
+            # Validate CSV format
+            try:
+                if self.validate_csv_format(path):
+                    self.console.print(f"\n[info]✓ CSV file validated: {path}[/info]")
+                    return str(path)
+                else:
+                    self.console.print(f"\n[error]✗ Invalid CSV format[/error]")
+            except Exception as e:
+                self.console.print(f"\n[error]✗ Error reading CSV: {e}[/error]")
+    
+    def validate_csv_format(self, csv_path: Path) -> bool:
+        """Validate CSV file has required columns"""
+        required_columns = {'new_path', 'original_modified', 'new_modified', 'extension', 'size_bytes'}
+        
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                columns = set(reader.fieldnames or [])
+                
+                if not required_columns.issubset(columns):
+                    missing = required_columns - columns
+                    self.console.print(f"\n[error]Missing required columns: {', '.join(missing)}[/error]")
+                    return False
+                
+                # Check if file has data
+                row_count = sum(1 for _ in reader)
+                if row_count == 0:
+                    self.console.print("\n[warning]CSV file is empty[/warning]")
+                    return False
+                
+                self.console.print(f"\n[info]CSV contains {row_count} files[/info]")
+                return True
+                
+        except Exception as e:
+            self.console.print(f"\n[error]Error validating CSV: {e}[/error]")
+            return False
     
     def get_directory_input(self) -> str:
         """Get directory path from user with validation"""
@@ -414,7 +500,7 @@ class FileRefresher:
             return None
     
     def process_file(self, file_info):
-        """Process a single file"""
+        """Process a single file with dry-run support"""
         result = {
             'original_path': file_info['path'],
             'new_path': file_info['path'],
@@ -431,17 +517,32 @@ class FileRefresher:
         
         if needs_rename:
             new_filename = self.get_new_filename(file_info, rename_reason)
-            new_path = self.rename_file(file_info['path'], new_filename)
-            if new_path:
-                result['new_path'] = new_path
+            
+            if self.dry_run:
+                # Simulate renaming for dry run
+                result['new_path'] = file_info['path'].parent / new_filename
                 result['renamed'] = True
-                file_info['path'] = new_path  # Update for date modification
+                logging.info(f"DRY RUN - Would rename: {file_info['path'].name} -> {new_filename}")
+            else:
+                # Actually rename the file
+                new_path = self.rename_file(file_info['path'], new_filename)
+                if new_path:
+                    result['new_path'] = new_path
+                    result['renamed'] = True
+                    file_info['path'] = new_path  # Update for date modification
         
         # Check if needs date update
         if self.needs_date_update(file_info):
-            if self.update_file_modified_date(result['new_path']):
+            if self.dry_run:
+                # Simulate date update for dry run
                 result['new_modified'] = datetime.now()
                 result['date_updated'] = True
+                logging.info(f"DRY RUN - Would update date: {result['new_path']}")
+            else:
+                # Actually update the date
+                if self.update_file_modified_date(result['new_path']):
+                    result['new_modified'] = datetime.now()
+                    result['date_updated'] = True
         
         return result
     
@@ -548,6 +649,100 @@ class FileRefresher:
         
         return results
     
+    def load_csv_file_list(self, csv_path: str) -> List[Dict]:
+        """Load file list from CSV input"""
+        files = []
+        
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                
+                for row in reader:
+                    file_path = Path(row['new_path'])
+                    
+                    # Check if file exists
+                    if not file_path.exists():
+                        error_msg = f"File not found in CSV: {file_path}"
+                        self.errors.append(error_msg)
+                        logging.warning(error_msg)
+                        continue
+                    
+                    # Parse dates
+                    try:
+                        original_modified = datetime.strptime(row['original_modified'], '%Y-%m-%d %H:%M:%S')
+                        new_modified = datetime.strptime(row['new_modified'], '%Y-%m-%d %H:%M:%S')
+                    except ValueError as e:
+                        error_msg = f"Invalid date format in CSV for {file_path}: {e}"
+                        self.errors.append(error_msg)
+                        logging.error(error_msg)
+                        continue
+                    
+                    files.append({
+                        'path': file_path,
+                        'size': int(row['size_bytes']),
+                        'modified': original_modified,
+                        'extension': f".{row['extension']}" if not row['extension'].startswith('.') else row['extension'],
+                        'csv_original_modified': original_modified,
+                        'csv_new_modified': new_modified
+                    })
+                    
+            logging.info(f"Loaded {len(files)} files from CSV: {csv_path}")
+            return files
+            
+        except Exception as e:
+            error_msg = f"Error loading CSV file {csv_path}: {e}"
+            self.errors.append(error_msg)
+            logging.error(error_msg)
+            if self.interactive:
+                self.console.print(f"[error]{error_msg}[/error]")
+            return []
+    
+    def process_csv_files_with_progress(self, csv_path: str):
+        """Process files from CSV input with progress display"""
+        self.console.print(f"\n[primary]LOADING CSV FILE...[/primary]")
+        files = self.load_csv_file_list(csv_path)
+        
+        if not files:
+            self.console.print("\n[error]No valid files found in CSV[/error]")
+            return []
+        
+        # Show summary
+        self.console.print(f"\n[primary]CSV INPUT SUMMARY:[/primary]")
+        self.console.print(f"└─ Files to process: [accent]{len(files)}[/accent]")
+        
+        if not Confirm.ask("\n[prompt]PROCEED WITH CSV FILE PROCESSING?[/prompt]", default=True):
+            self.console.print("\n[warning]Operation cancelled by user[/warning]")
+            return []
+        
+        self.console.print("\n[primary]PROCESSING FILES...[/primary]\n")
+        
+        results = []
+        
+        # Create progress bar
+        with Progress(
+            SpinnerColumn(style="primary"),
+            TextColumn("[primary]{task.description}[/primary]"),
+            BarColumn(complete_style="primary", finished_style="secondary"),
+            TextColumn("[accent]{task.percentage:>3.0f}%[/accent]"),
+            TimeRemainingColumn(),
+            console=self.console
+        ) as progress:
+            
+            task = progress.add_task("Processing", total=len(files))
+            
+            for i, file_info in enumerate(files):
+                # Update progress description
+                progress.update(
+                    task, 
+                    description=f"[{i+1}/{len(files)}] {file_info['path'].name[:50]}...",
+                    advance=1
+                )
+                
+                result = self.process_file(file_info)
+                results.append(result)
+        
+        return results
+    
     def show_completion_summary(self, results):
         """Display completion summary"""
         renamed_count = sum(1 for r in results if r['renamed'])
@@ -602,6 +797,15 @@ def main():
         action='store_true',
         help='Run without interactive UI'
     )
+    parser.add_argument(
+        '--csv-input',
+        help='Process files from CSV input file'
+    )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Preview changes without making them (report only)'
+    )
     
     args = parser.parse_args()
     
@@ -613,33 +817,82 @@ def main():
         if interactive:
             # Interactive mode with retro UI
             refresher.show_welcome_screen()
-            directory = refresher.get_directory_input()
-            refresher.show_config_review()
-            results = refresher.process_directory_with_progress(directory)
             
-            # Generate CSV report
-            report_path = refresher.generate_csv_report(results, directory)
+            # Get mode selection
+            mode = refresher.get_mode_selection()
             
-            # Show completion summary
-            refresher.show_completion_summary(results)
-            refresher.show_report_location(report_path)
+            if mode == "D":
+                # Directory Mode
+                directory = refresher.get_directory_input()
+                operation_type = refresher.get_operation_type()
+                
+                # Set dry run mode
+                refresher.dry_run = (operation_type == "R")
+                
+                refresher.show_config_review()
+                results = refresher.process_directory_with_progress(directory)
+                
+                # Generate CSV report
+                report_path = refresher.generate_csv_report(results, directory)
+                
+                # Show completion summary with dry run indication
+                if refresher.dry_run:
+                    refresher.console.print("\n[info]🔍 DRY RUN MODE - No files were actually modified[/info]")
+                refresher.show_completion_summary(results)
+                refresher.show_report_location(report_path)
+                
+            else:
+                # CSV Input Mode
+                csv_path = refresher.get_csv_input()
+                results = refresher.process_csv_files_with_progress(csv_path)
+                
+                # Generate CSV report in same directory as input CSV
+                csv_dir = str(Path(csv_path).parent)
+                report_path = refresher.generate_csv_report(results, csv_dir)
+                
+                # Show completion summary
+                refresher.show_completion_summary(results)
+                refresher.show_report_location(report_path)
         else:
             # Command line mode (backward compatibility)
-            directory = args.directory or '.'
-            # Use simplified processing for command line mode
             refresher.interactive = False
-            files = refresher.scan_directory(directory)
-            results = []
-            for file_info in files:
-                result = refresher.process_file(file_info)
-                results.append(result)
+            refresher.dry_run = args.dry_run
             
-            # Generate CSV report
-            report_path = refresher.generate_csv_report(results, directory)
+            if args.csv_input:
+                # CSV Input Mode
+                if not Path(args.csv_input).exists():
+                    print(f"Error: CSV file not found: {args.csv_input}")
+                    sys.exit(1)
+                
+                # Load and process files from CSV
+                files = refresher.load_csv_file_list(args.csv_input)
+                results = []
+                for file_info in files:
+                    result = refresher.process_file(file_info)
+                    results.append(result)
+                
+                # Generate CSV report in same directory as input
+                csv_dir = str(Path(args.csv_input).parent)
+                report_path = refresher.generate_csv_report(results, csv_dir)
+                
+            else:
+                # Directory Mode
+                directory = args.directory or '.'
+                files = refresher.scan_directory(directory)
+                results = []
+                for file_info in files:
+                    result = refresher.process_file(file_info)
+                    results.append(result)
+                
+                # Generate CSV report
+                report_path = refresher.generate_csv_report(results, directory)
             
             # Summary
             renamed_count = sum(1 for r in results if r['renamed'])
             updated_count = sum(1 for r in results if r['date_updated'])
+            
+            if refresher.dry_run:
+                print("\n🔍 DRY RUN MODE - No files were actually modified")
             
             print(f"\nSummary:")
             print(f"Files processed: {len(results)}")
