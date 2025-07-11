@@ -659,8 +659,8 @@ class FileRefresher:
     def process_file(self, file_info):
         """Process a single file with dry-run support"""
         result = {
-            'original_path': file_info['path'],
-            'new_path': file_info['path'],
+            'original_path': file_info['path'].resolve(),
+            'new_path': file_info['path'].resolve(),
             'original_modified': file_info['modified'],
             'new_modified': file_info['modified'],
             'extension': file_info['extension'].replace('.', ''),
@@ -677,16 +677,16 @@ class FileRefresher:
             
             if self.dry_run:
                 # Simulate renaming for dry run
-                result['new_path'] = file_info['path'].parent / new_filename
+                result['new_path'] = (file_info['path'].parent / new_filename).resolve()
                 result['renamed'] = True
                 logging.info(f"DRY RUN - Would rename: {file_info['path'].name} -> {new_filename}")
             else:
                 # Actually rename the file
                 new_path = self.rename_file(file_info['path'], new_filename)
                 if new_path:
-                    result['new_path'] = new_path
+                    result['new_path'] = Path(new_path).resolve()
                     result['renamed'] = True
-                    file_info['path'] = new_path  # Update for date modification
+                    file_info['path'] = Path(new_path).resolve()  # Update for date modification
         
         # Check if needs date update
         if self.needs_date_update(file_info):
