@@ -86,7 +86,7 @@ class FileRefresher:
     def _get_default_config(self):
         """Return default configuration"""
         return {
-            'rename_extensions': ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.vsdx', '.vsd', '.pdf'],
+            'rename_extensions': ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.vsdx', '.vsd'],
             'days_threshold': 30,
             'report': {
                 'filename_pattern': 'file_refresh_report_{date}.csv',
@@ -395,8 +395,7 @@ class FileRefresher:
             '.pptx': 'PowerPoint Presentations',
             '.ppt': 'Legacy PowerPoint',
             '.vsdx': 'Visio Diagrams',
-            '.vsd': 'Legacy Visio',
-            '.pdf': 'PDF Documents'
+            '.vsd': 'Legacy Visio'
         }
         
         for ext in self.rename_extensions:

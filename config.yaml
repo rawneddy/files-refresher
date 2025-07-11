@@ -12,8 +12,6 @@ rename_extensions:
   # Microsoft Visio
   - .vsdx
   - .vsd
-  # Documents
-  - .pdf
   # Add custom extensions below
   # - .dwg
   # - .txt
