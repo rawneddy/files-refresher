@@ -432,6 +432,10 @@ class FileRefresher:
             
             for file_path in path.glob(pattern):
                 if file_path.is_file():
+                    # Skip all CSV files (report files, sample files, etc.)
+                    if file_path.suffix.lower() == '.csv':
+                        continue
+                    
                     try:
                         stat = file_path.stat()
                         files.append({
