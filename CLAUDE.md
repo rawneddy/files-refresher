@@ -1,7 +1,7 @@
 # CLAUDE.md - AI Context for File Retention Refresher
 
 ## Project Overview
-This is a Python application designed to bypass file retention policies by updating modification dates and intelligently renaming files. It features a retro Apple II-style terminal interface and supports both bulk and targeted file processing.
+This is a Python application designed to help keep files fresh by updating modification dates and intelligently renaming files. It features a retro Apple II-style terminal interface and supports both bulk and targeted file processing.
 
 ## Key Requirements
 

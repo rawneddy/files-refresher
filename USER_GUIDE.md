@@ -13,7 +13,7 @@
 
 ## Introduction
 
-File Retention Refresher is a tool designed to bypass file retention policies that delete files based on their modification date. It works by:
+File Retention Refresher is a tool designed to help you freshen files that would otherwise be deleted based on retention rules.  This lets you keep important older files without all the manual work. It works by:
 
 1. **Updating modification dates** to the current date/time for files older than 30 days
 2. **Intelligently renaming files** to preserve their original dates in the filename

@@ -92,7 +92,7 @@ class FileRefresher:
         
         self.console.print(logo, style="primary", justify="center")
         self.console.print("\n")
-        self.console.print("Bypass retention policies by refreshing file dates", style="secondary", justify="center")
+        self.console.print("Avoid retention constraints by refreshing file dates", style="secondary", justify="center")
         self.console.print("and preserving original dates in filenames", style="secondary", justify="center")
         self.console.print("\n")
         
