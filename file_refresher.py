@@ -137,6 +137,59 @@ class FileRefresher:
         self.console.print(f"\n[primary]{title}[/primary]")
         self.console.print("─" * 50, style="border")
     
+    def _open_file_browser(self, title: str, filetypes: list) -> str:
+        """Open a file browser dialog"""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            # Create a hidden root window
+            root = tk.Tk()
+            root.withdraw()  # Hide the main window
+            root.attributes('-topmost', True)  # Bring dialog to front
+            
+            # Open file dialog
+            file_path = filedialog.askopenfilename(
+                title=f"Select {title}",
+                filetypes=filetypes
+            )
+            
+            root.destroy()  # Clean up
+            return file_path
+            
+        except ImportError:
+            self.console.print("\n[error]✗ File browser not available (tkinter not installed)[/error]")
+            return ""
+        except Exception as e:
+            self.console.print(f"\n[error]✗ Error opening file browser: {e}[/error]")
+            return ""
+    
+    def _open_directory_browser(self) -> str:
+        """Open a directory browser dialog"""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            # Create a hidden root window
+            root = tk.Tk()
+            root.withdraw()  # Hide the main window
+            root.attributes('-topmost', True)  # Bring dialog to front
+            
+            # Open directory dialog
+            directory_path = filedialog.askdirectory(
+                title="Select target directory"
+            )
+            
+            root.destroy()  # Clean up
+            return directory_path
+            
+        except ImportError:
+            self.console.print("\n[error]✗ Directory browser not available (tkinter not installed)[/error]")
+            return ""
+        except Exception as e:
+            self.console.print(f"\n[error]✗ Error opening directory browser: {e}[/error]")
+            return ""
+    
     def get_mode_selection(self) -> str:
         """Get user selection for operation mode"""
         self.console.clear()
@@ -168,8 +221,25 @@ class FileRefresher:
         self.console.clear()
         self._show_step_header("CSV INPUT SELECTION", "Step 3 of 3")
         
+        self.console.print("\n[accent]Select your CSV file:[/accent]")
+        self.console.print("[secondary]• Type the full path to your CSV file[/secondary]")
+        self.console.print("[secondary]• Drag and drop your CSV file into this terminal[/secondary]")
+        self.console.print("[secondary]• Type 'browse' to open a file browser[/secondary]")
+        self.console.print("[secondary]• Press Enter after pasting/dropping the path[/secondary]")
+        
         while True:
-            csv_path = Prompt.ask("\n[prompt]> CSV INPUT FILE[/prompt]")
+            csv_path = Prompt.ask("\n[prompt]> CSV INPUT FILE (drag & drop, type path, or 'browse')[/prompt]")
+            
+            # Check if user wants to browse
+            if csv_path.lower().strip() == 'browse':
+                csv_path = self._open_file_browser("CSV files", [("CSV files", "*.csv"), ("All files", "*.*")])
+                if not csv_path:  # User cancelled
+                    continue
+            
+            # Handle drag-and-drop path formatting
+            # Remove surrounding quotes and handle escaped spaces
+            csv_path = csv_path.strip().strip('"').strip("'")
+            csv_path = csv_path.replace('\\ ', ' ')  # Handle escaped spaces (common on macOS/Linux)
             
             path = Path(csv_path).expanduser().resolve()
             
@@ -227,11 +297,28 @@ class FileRefresher:
         self.console.clear()
         self._show_step_header("DIRECTORY SELECTION", "Step 3 of 4")
         
+        self.console.print("\n[accent]Select target directory:[/accent]")
+        self.console.print("[secondary]• Type the full path to your directory[/secondary]")
+        self.console.print("[secondary]• Drag and drop a folder into this terminal[/secondary]")
+        self.console.print("[secondary]• Type 'browse' to open a folder browser[/secondary]")
+        self.console.print(f"[secondary]• Press Enter for current directory: {os.getcwd()}[/secondary]")
+        
         while True:
             directory = Prompt.ask(
-                "\n[prompt]> SELECT DIRECTORY[/prompt]",
+                "\n[prompt]> SELECT DIRECTORY (drag & drop, type path, or 'browse')[/prompt]",
                 default=os.getcwd()
             )
+            
+            # Check if user wants to browse
+            if directory.lower().strip() == 'browse':
+                directory = self._open_directory_browser()
+                if not directory:  # User cancelled
+                    continue
+            
+            # Handle drag-and-drop path formatting
+            # Remove surrounding quotes and handle escaped spaces
+            directory = directory.strip().strip('"').strip("'")
+            directory = directory.replace('\\ ', ' ')  # Handle escaped spaces (common on macOS/Linux)
             
             path = Path(directory).expanduser().resolve()
             
