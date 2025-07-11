@@ -116,10 +116,24 @@ class FileRefresher:
         with self.console.status("[primary]Press ENTER to continue...[/primary]", spinner="dots"):
             input()
     
+    def _show_step_header(self, title: str, step_info: str = ""):
+        """Show consistent header for each step"""
+        # Mini logo for consistency
+        self.console.print("╔═══════════════════════════════════════════════════╗", style="border")
+        self.console.print("║          FILE RETENTION REFRESHER v1.0            ║", style="title")
+        self.console.print("║              [ APPLE ][ STYLE ]                   ║", style="title")
+        self.console.print("╚═══════════════════════════════════════════════════╝", style="border")
+        
+        if step_info:
+            self.console.print(f"\n[info]{step_info}[/info]")
+        
+        self.console.print(f"\n[primary]{title}[/primary]")
+        self.console.print("─" * 50, style="border")
+    
     def get_mode_selection(self) -> str:
         """Get user selection for operation mode"""
-        self.console.print("\n[primary]MODE SELECTION[/primary]")
-        self.console.print("─" * 50, style="border")
+        self.console.clear()
+        self._show_step_header("MODE SELECTION", "Step 1 of 4")
         
         self.console.print("\n[accent]Choose operation mode:[/accent]")
         self.console.print("[secondary]D[/secondary] - Directory Mode: Process all files in a directory")
@@ -131,8 +145,8 @@ class FileRefresher:
     
     def get_operation_type(self) -> str:
         """Get user selection for operation type (Directory mode only)"""
-        self.console.print("\n[primary]OPERATION TYPE[/primary]")
-        self.console.print("─" * 50, style="border")
+        self.console.clear()
+        self._show_step_header("OPERATION TYPE", "Step 2 of 4")
         
         self.console.print("\n[accent]Choose operation type:[/accent]")
         self.console.print("[secondary]P[/secondary] - Process Files: Make actual changes to files")
@@ -144,8 +158,8 @@ class FileRefresher:
     
     def get_csv_input(self) -> str:
         """Get CSV input file path with validation"""
-        self.console.print("\n[primary]CSV INPUT SELECTION[/primary]")
-        self.console.print("─" * 50, style="border")
+        self.console.clear()
+        self._show_step_header("CSV INPUT SELECTION", "Step 2 of 3")
         
         while True:
             csv_path = Prompt.ask("\n[prompt]> CSV INPUT FILE[/prompt]")
@@ -203,8 +217,8 @@ class FileRefresher:
     
     def get_directory_input(self) -> str:
         """Get directory path from user with validation"""
-        self.console.print("\n[primary]DIRECTORY SELECTION[/primary]")
-        self.console.print("─" * 50, style="border")
+        self.console.clear()
+        self._show_step_header("DIRECTORY SELECTION", "Step 3 of 4")
         
         while True:
             directory = Prompt.ask(
@@ -223,8 +237,10 @@ class FileRefresher:
     
     def show_config_review(self):
         """Display configuration review screen"""
-        self.console.print("\n[primary]CONFIGURATION REVIEW:[/primary]")
-        self.console.print("─" * 50, style="border")
+        self.console.clear()
+        self._show_step_header("CONFIGURATION REVIEW", "Step 4 of 4")
+        
+        self.console.print("\n[accent]Review settings before proceeding:[/accent]")
         
         # Create extensions table
         table = Table(
@@ -299,6 +315,8 @@ class FileRefresher:
     
     def show_pre_scan_summary(self, files: List[Dict]) -> bool:
         """Display pre-scan summary and get confirmation"""
+        self.console.clear()
+        self._show_step_header("FILE SCAN RESULTS", "Review before processing")
         # Categorize files
         stats = defaultdict(int)
         already_dated_dots = 0
@@ -745,12 +763,10 @@ class FileRefresher:
     
     def show_completion_summary(self, results):
         """Display completion summary"""
+        self.console.clear()
+        self._show_step_header("PROCESSING COMPLETE", "Operation finished")
         renamed_count = sum(1 for r in results if r['renamed'])
         updated_count = sum(1 for r in results if r['date_updated'])
-        
-        self.console.print("\n[primary]╔═══════════════════════════════════════╗[/primary]")
-        self.console.print("[primary]║        PROCESSING COMPLETE!           ║[/primary]")
-        self.console.print("[primary]╚═══════════════════════════════════════╝[/primary]")
         
         summary_table = Table(box=None, show_header=False, style="secondary")
         summary_table.add_column("Label", style="accent")
