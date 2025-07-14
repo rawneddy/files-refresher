@@ -2,12 +2,29 @@
 """Create test files for development and testing"""
 
 import os
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
 def create_test_files():
     test_dir = Path("test_files")
-    test_dir.mkdir(exist_ok=True)
+    
+    # Remove the entire directory if it exists, then recreate it
+    if test_dir.exists():
+        print(f"Removing existing '{test_dir}' directory...")
+        try:
+            shutil.rmtree(test_dir)
+        except PermissionError as e:
+            print(f"ERROR: Permission denied removing directory: {e}")
+            print("Try running as administrator or check if files are in use")
+            return
+        except Exception as e:
+            print(f"ERROR: Failed to remove directory: {e}")
+            return
+    
+    # Create fresh directory
+    print(f"Creating fresh '{test_dir}' directory...")
+    test_dir.mkdir()
     
     # Generate 50 test files with variety
     test_files = [
@@ -86,20 +103,31 @@ def create_test_files():
         ("Today Notes.txt", 2),
     ]
     
+    created_count = 0
     for filename, days_old in test_files:
         file_path = test_dir / filename
         
-        # Create file
-        file_path.write_text(f"Test file: {filename}")
-        
-        # Set modification date
-        old_date = datetime.now() - timedelta(days=days_old)
-        timestamp = old_date.timestamp()
-        os.utime(file_path, (timestamp, timestamp))
-        
-        print(f"Created: {filename} ({days_old} days old)")
+        try:
+            # Create file
+            file_path.write_text(f"Test file: {filename}")
+            
+            # Set modification date
+            old_date = datetime.now() - timedelta(days=days_old)
+            timestamp = old_date.timestamp()
+            os.utime(file_path, (timestamp, timestamp))
+            
+            print(f"Created: {filename} ({days_old} days old)")
+            created_count += 1
+            
+        except PermissionError as e:
+            print(f"ERROR: Permission denied creating '{filename}': {e}")
+        except Exception as e:
+            print(f"ERROR: Failed to create '{filename}': {e}")
     
-    print(f"\nCreated {len(test_files)} test files in '{test_dir}' directory")
+    if created_count != len(test_files):
+        print(f"\nWARNING: Only {created_count} of {len(test_files)} files were created successfully")
+    
+    print(f"\nCreated {created_count} test files in '{test_dir}' directory")
     print(f"File breakdown:")
     print(f"  - Excel files (.xlsx/.xls): {len([f for f in test_files if f[0].endswith(('.xlsx', '.xls'))])}")
     print(f"  - Word files (.docx/.doc): {len([f for f in test_files if f[0].endswith(('.docx', '.doc'))])}")

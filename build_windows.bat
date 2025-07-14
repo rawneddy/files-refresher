@@ -47,6 +47,9 @@ if errorlevel 1 (
 )
 
 echo [5/6] Building executable with PyInstaller...
+REM Clean PyInstaller build directories
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
 pyinstaller --clean --noconfirm file_refresher.spec
 if errorlevel 1 (
     echo ERROR: PyInstaller build failed
@@ -55,19 +58,19 @@ if errorlevel 1 (
 )
 
 echo [6/6] Packaging distribution...
-if exist dist\windows rmdir /s /q dist\windows
-mkdir dist\windows
-copy dist\file_refresher.exe dist\windows\
-copy config.yaml dist\windows\
-copy README.md dist\windows\
-copy USER_GUIDE.md dist\windows\
+if exist dist\win rmdir /s /q dist\win
+mkdir dist\win
+copy dist\file_refresher.exe dist\win\
+copy config.yaml dist\win\
+copy README.md dist\win\
+copy USER_GUIDE.md dist\win\
 
 echo.
 echo ===============================================
 echo BUILD COMPLETE!
 echo ===============================================
 echo.
-echo Executable created: dist\windows\file_refresher.exe
+echo Executable created: dist\win\file_refresher.exe
 echo.
 echo Distribution package contents:
 echo - file_refresher.exe (main executable)
@@ -75,7 +78,7 @@ echo - config.yaml (configuration file)
 echo - README.md (quick start guide)
 echo - USER_GUIDE.md (detailed documentation)
 echo.
-echo You can now distribute the 'dist\windows' folder
+echo You can now distribute the 'dist\win' folder
 echo or create a ZIP file for easy sharing.
 echo.
 pause

@@ -52,6 +52,7 @@ class FileRefresher:
         self.console = Console(theme=RETRO_THEME, force_terminal=True)
         self.errors = []
         self.dry_run = False
+        self.refresh_only = False
         self.setup_logging()
         
         # Date patterns
@@ -229,11 +230,12 @@ class FileRefresher:
         self._show_step_header("OPERATION TYPE", "Step 4 of 4", selected_path)
         
         self.console.print("\n[accent]Choose operation type:[/accent]")
-        self.console.print("[secondary]P[/secondary] - Process Files: Make actual changes to files")
-        self.console.print("[secondary]R[/secondary] - Report Only: Generate CSV report without making changes (dry run)")
+        self.console.print("[secondary]P[/secondary] - Process Files: Rename files AND update modification dates")
+        self.console.print("[secondary]U[/secondary] - Update Dates Only: Update modification dates without renaming")
+        self.console.print("[secondary]R[/secondary] - Report Only: Generate CSV report without making changes")
         
         while True:
-            choice = Prompt.ask("\n[prompt]> OPERATION TYPE [P/R][/prompt]", choices=["P", "R", "p", "r"], default="P")
+            choice = Prompt.ask("\n[prompt]> OPERATION TYPE [P/U/R][/prompt]", choices=["P", "U", "R", "p", "u", "r"], default="P")
             return choice.upper()
     
     def get_csv_input(self) -> str:
@@ -451,7 +453,12 @@ class FileRefresher:
     def show_pre_scan_summary(self, files: List[Dict], selected_path: str = "") -> bool:
         """Display pre-scan summary and get confirmation"""
         self.console.clear()
-        step_info = "Review report scope" if self.dry_run else "Review before processing"
+        if self.dry_run:
+            step_info = "Review report scope"
+        elif self.refresh_only:
+            step_info = "Review refresh scope"
+        else:
+            step_info = "Review before processing"
         self._show_step_header("FILE SCAN RESULTS", step_info, selected_path)
         # Categorize files
         stats = defaultdict(int)
@@ -472,9 +479,9 @@ class FileRefresher:
                 already_dated_dots += 1
             elif self.date_pattern_hyphens.match(filename):
                 already_dated_hyphens += 1
-                if ext in self.rename_extensions:
+                if ext in self.rename_extensions and not self.refresh_only:
                     will_rename += 1
-            elif ext in self.rename_extensions:
+            elif ext in self.rename_extensions and not self.refresh_only:
                 will_rename += 1
             
             # Check if needs date update
@@ -502,17 +509,33 @@ class FileRefresher:
         self.console.print(table)
         
         # Summary statistics
-        summary_title = "REPORT PREVIEW:" if self.dry_run else "PROCESSING SUMMARY:"
+        if self.dry_run:
+            summary_title = "REPORT PREVIEW:"
+        elif self.refresh_only:
+            summary_title = "REFRESH SUMMARY:"
+        else:
+            summary_title = "PROCESSING SUMMARY:"
+        
         self.console.print(f"\n[primary]{summary_title}[/primary]")
-        self.console.print(f"├─ Files already dated (YYYY.MM.DD): [accent]{already_dated_dots}[/accent]")
-        self.console.print(f"├─ Files already dated (YYYY-MM-DD): [accent]{already_dated_hyphens}[/accent]")
-        self.console.print(f"├─ Files to rename: [accent]{will_rename}[/accent]")
-        self.console.print(f"├─ Dates to update: [accent]{will_update_date}[/accent]")
-        self.console.print(f"└─ TOTAL FILES: [accent]{len(files)}[/accent]")
+        
+        if self.refresh_only:
+            # For refresh-only mode, don't show rename statistics
+            self.console.print(f"├─ Files to update dates: [accent]{will_update_date}[/accent]")
+            self.console.print(f"└─ TOTAL FILES: [accent]{len(files)}[/accent]")
+        else:
+            # For report and process modes, show all statistics
+            self.console.print(f"├─ Files already dated (YYYY.MM.DD): [accent]{already_dated_dots}[/accent]")
+            self.console.print(f"├─ Files already dated (YYYY-MM-DD): [accent]{already_dated_hyphens}[/accent]")
+            self.console.print(f"├─ Files to rename: [accent]{will_rename}[/accent]")
+            self.console.print(f"├─ Dates to update: [accent]{will_update_date}[/accent]")
+            self.console.print(f"└─ TOTAL FILES: [accent]{len(files)}[/accent]")
         
         if self.dry_run:
             self.console.print("\n[info]ℹ️  Report Only Mode - No files will be modified[/info]")
             prompt_text = "GENERATE REPORT FOR THESE FILES?"
+        elif self.refresh_only:
+            self.console.print("\n[info]📅 Refresh Only Mode - Only modification dates will be updated[/info]")
+            prompt_text = "REFRESH MODIFICATION DATES FOR THESE FILES?"
         else:
             prompt_text = "PROCEED WITH FILE PROCESSING?"
             
@@ -680,24 +703,25 @@ class FileRefresher:
             'date_updated': False
         }
         
-        # Check if needs renaming
-        needs_rename, rename_reason = self.needs_rename(file_info)
-        
-        if needs_rename:
-            new_filename = self.get_new_filename(file_info, rename_reason)
+        # Check if needs renaming (skip if in refresh_only mode)
+        if not self.refresh_only:
+            needs_rename, rename_reason = self.needs_rename(file_info)
             
-            if self.dry_run:
-                # Simulate renaming for dry run
-                result['new_path'] = (file_info['path'].parent / new_filename).resolve()
-                result['renamed'] = True
-                logging.info(f"DRY RUN - Would rename: {file_info['path'].name} -> {new_filename}")
-            else:
-                # Actually rename the file
-                new_path = self.rename_file(file_info['path'], new_filename)
-                if new_path:
-                    result['new_path'] = Path(new_path).resolve()
+            if needs_rename:
+                new_filename = self.get_new_filename(file_info, rename_reason)
+                
+                if self.dry_run:
+                    # Simulate renaming for dry run
+                    result['new_path'] = (file_info['path'].parent / new_filename).resolve()
                     result['renamed'] = True
-                    file_info['path'] = Path(new_path).resolve()  # Update for date modification
+                    logging.info(f"DRY RUN - Would rename: {file_info['path'].name} -> {new_filename}")
+                else:
+                    # Actually rename the file
+                    new_path = self.rename_file(file_info['path'], new_filename)
+                    if new_path:
+                        result['new_path'] = Path(new_path).resolve()
+                        result['renamed'] = True
+                        file_info['path'] = Path(new_path).resolve()  # Update for date modification
         
         # Check if needs date update
         if self.needs_date_update(file_info):
@@ -788,7 +812,12 @@ class FileRefresher:
             self.console.print("\n[warning]Operation cancelled by user[/warning]")
             return []
         
-        processing_title = "ANALYZING FILES..." if self.dry_run else "PROCESSING FILES..."
+        if self.dry_run:
+            processing_title = "ANALYZING FILES..."
+        elif self.refresh_only:
+            processing_title = "REFRESHING DATES..."
+        else:
+            processing_title = "PROCESSING FILES..."
         self.console.print(f"\n[primary]{processing_title}[/primary]\n")
         
         results = []
@@ -1006,21 +1035,24 @@ def main():
                 directory = refresher.get_directory_input()
                 operation_type = refresher.get_operation_type(directory)
                 
-                # Only show configuration review for Process Files mode
+                # Only show configuration review for Process Files mode (rename + refresh)
                 if operation_type == "P":
                     refresher.show_config_review()
                 
-                # Set dry run mode
+                # Set operation modes
                 refresher.dry_run = (operation_type == "R")
+                refresher.refresh_only = (operation_type == "U")
                 
                 results = refresher.process_directory_with_progress(directory)
                 
                 # Generate CSV report
                 report_path = refresher.generate_csv_report(results, directory)
                 
-                # Show completion summary with dry run indication
+                # Show completion summary with mode indication
                 if refresher.dry_run:
                     refresher.console.print("\n[info]🔍 DRY RUN MODE - No files were actually modified[/info]")
+                elif refresher.refresh_only:
+                    refresher.console.print("\n[info]📅 REFRESH ONLY MODE - Only modification dates were updated[/info]")
                 refresher.show_completion_summary(results, directory)
                 refresher.show_report_location(report_path)
                 
@@ -1078,6 +1110,8 @@ def main():
             
             if refresher.dry_run:
                 print("\n🔍 DRY RUN MODE - No files were actually modified")
+            elif refresher.refresh_only:
+                print("\n📅 REFRESH ONLY MODE - Only modification dates were updated")
             
             print(f"\nSummary:")
             print(f"Files processed: {len(results)}")

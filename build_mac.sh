@@ -68,8 +68,11 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "[5/6] Building executable with PyInstaller..."
+echo "Cleaning previous build artifacts..."
+rm -rf build
+rm -rf dist
 echo "Building with spec file configuration..."
-pyinstaller file_refresher.spec --noconfirm
+pyinstaller --clean --noconfirm file_refresher.spec
 
 if [ $? -ne 0 ]; then
     echo "ERROR: PyInstaller build failed"
