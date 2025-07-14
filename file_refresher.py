@@ -102,7 +102,6 @@ class FileRefresher:
         logo = """
 ╔═══════════════════════════════════════════════════╗
 ║          FILE RETENTION REFRESHER v1.0            ║
-║              [ APPLE ][ STYLE ]                   ║
 ╚═══════════════════════════════════════════════════╝
 """
         
@@ -121,7 +120,6 @@ class FileRefresher:
         # Mini logo for consistency
         self.console.print("╔═══════════════════════════════════════════════════╗", style="border")
         self.console.print("║          FILE RETENTION REFRESHER v1.0            ║", style="title")
-        self.console.print("║              [ APPLE ][ STYLE ]                   ║", style="title")
         self.console.print("╚═══════════════════════════════════════════════════╝", style="border")
         
         if step_info:
@@ -453,7 +451,8 @@ class FileRefresher:
     def show_pre_scan_summary(self, files: List[Dict], selected_path: str = "") -> bool:
         """Display pre-scan summary and get confirmation"""
         self.console.clear()
-        self._show_step_header("FILE SCAN RESULTS", "Review before processing", selected_path)
+        step_info = "Review report scope" if self.dry_run else "Review before processing"
+        self._show_step_header("FILE SCAN RESULTS", step_info, selected_path)
         # Categorize files
         stats = defaultdict(int)
         already_dated_dots = 0
@@ -503,14 +502,21 @@ class FileRefresher:
         self.console.print(table)
         
         # Summary statistics
-        self.console.print("\n[primary]PROCESSING SUMMARY:[/primary]")
+        summary_title = "REPORT PREVIEW:" if self.dry_run else "PROCESSING SUMMARY:"
+        self.console.print(f"\n[primary]{summary_title}[/primary]")
         self.console.print(f"├─ Files already dated (YYYY.MM.DD): [accent]{already_dated_dots}[/accent]")
         self.console.print(f"├─ Files already dated (YYYY-MM-DD): [accent]{already_dated_hyphens}[/accent]")
         self.console.print(f"├─ Files to rename: [accent]{will_rename}[/accent]")
         self.console.print(f"├─ Dates to update: [accent]{will_update_date}[/accent]")
         self.console.print(f"└─ TOTAL FILES: [accent]{len(files)}[/accent]")
         
-        return Confirm.ask("\n[prompt]PROCEED WITH FILE PROCESSING?[/prompt]", default=True)
+        if self.dry_run:
+            self.console.print("\n[info]ℹ️  Report Only Mode - No files will be modified[/info]")
+            prompt_text = "GENERATE REPORT FOR THESE FILES?"
+        else:
+            prompt_text = "PROCEED WITH FILE PROCESSING?"
+            
+        return Confirm.ask(f"\n[prompt]{prompt_text}[/prompt]", default=True)
     
     def needs_date_update(self, file_info):
         """Check if file modification date needs updating"""
@@ -782,7 +788,8 @@ class FileRefresher:
             self.console.print("\n[warning]Operation cancelled by user[/warning]")
             return []
         
-        self.console.print("\n[primary]PROCESSING FILES...[/primary]\n")
+        processing_title = "ANALYZING FILES..." if self.dry_run else "PROCESSING FILES..."
+        self.console.print(f"\n[primary]{processing_title}[/primary]\n")
         
         results = []
         
@@ -991,9 +998,6 @@ def main():
             # Interactive mode with retro UI
             refresher.show_welcome_screen()
             
-            # Show configuration review first
-            refresher.show_config_review()
-            
             # Get mode selection
             mode = refresher.get_mode_selection()
             
@@ -1001,6 +1005,10 @@ def main():
                 # Directory Mode
                 directory = refresher.get_directory_input()
                 operation_type = refresher.get_operation_type(directory)
+                
+                # Only show configuration review for Process Files mode
+                if operation_type == "P":
+                    refresher.show_config_review()
                 
                 # Set dry run mode
                 refresher.dry_run = (operation_type == "R")
@@ -1018,6 +1026,8 @@ def main():
                 
             else:
                 # CSV Input Mode
+                # Show configuration review first for CSV mode (always processes files)
+                refresher.show_config_review()
                 csv_path = refresher.get_csv_input()
                 results = refresher.process_csv_files_with_progress(csv_path)
                 
