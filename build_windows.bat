@@ -60,7 +60,7 @@ if errorlevel 1 (
 echo [6/6] Packaging distribution...
 if exist dist\win rmdir /s /q dist\win
 mkdir dist\win
-copy dist\file_refresher.exe dist\win\
+move dist\file_refresher.exe dist\win\
 copy config.yaml dist\win\
 copy README.md dist\win\
 copy USER_GUIDE.md dist\win\

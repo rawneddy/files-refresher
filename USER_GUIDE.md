@@ -33,7 +33,7 @@ cd files-refresher
 build_windows.bat
 
 # Run the application (can double-click or use command prompt)
-cd dist\windows
+cd dist\win
 file_refresher.exe
 ```
 
@@ -87,11 +87,12 @@ Processes all files in a directory and its subdirectories.
 
 > SELECT MODE: [D]irectory or [C]SV Input? D
 > SELECT DIRECTORY: /Users/documents/archive
-> OPERATION TYPE: [P]rocess Files or [R]eport Only? P
+> OPERATION TYPE: [P]rocess Files, [U]pdate Dates Only, or [R]eport Only? P
 ```
 
 **Options:**
-- **Process Files**: Makes actual changes to files
+- **Process Files**: Makes actual changes to files (rename + date update)
+- **Update Dates Only**: Updates modification dates without renaming
 - **Report Only**: Generates CSV without making changes
 
 ### CSV Input Mode
@@ -159,7 +160,21 @@ python file_refresher.py
 # Modification dates set to today
 ```
 
-### Example 2: Selective Processing
+### Example 2: Update Dates Only
+```bash
+# Scenario: Refresh dates without changing filenames
+python file_refresher.py
+
+# 1. Choose Directory mode
+# 2. Enter: /Users/documents/reports
+# 3. Choose Update Dates Only
+# 4. Confirm
+
+# Result: Only modification dates updated to today
+# Original filenames preserved (no renaming)
+```
+
+### Example 3: Selective Processing
 ```bash
 # Step 1: Generate a preview report
 python file_refresher.py
@@ -173,7 +188,7 @@ python file_refresher.py
 # Select edited CSV file
 ```
 
-### Example 3: Multiple Runs Safety
+### Example 4: Multiple Runs Safety
 ```bash
 # First run:
 "Presentation.pptx" → "2019.06.22 Presentation.pptx"
@@ -291,7 +306,7 @@ python3 create_test_files.py
 rm -rf test_files
 python3 create_test_files.py
 
-# Verify clean state (should show 13 files)
+# Verify clean state (should show 50 files)
 ls -la test_files/
 ```
 

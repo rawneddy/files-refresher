@@ -42,7 +42,7 @@ files-refresher/
 ├── BUILD_INSTRUCTIONS.md # How to create executables
 ├── .gitignore            # Git ignore patterns
 ├── dist/                 # Build outputs (gitignored)
-│   ├── windows/          # Windows executable + files
+│   ├── win/              # Windows executable + files
 │   └── mac/              # Mac executable + files
 ├── build/                # PyInstaller temp files (gitignored)
 ├── build_env/            # Virtual environment (gitignored)
@@ -73,6 +73,7 @@ files-refresher/
 - **Input**: Target directory path
 - **Options**:
   - Process Files: Execute renaming and date updates
+  - Update Dates Only: Update modification dates without renaming
   - Report Only: Generate CSV without making changes (dry run)
 - **Recursive**: Processes all subdirectories
 
@@ -290,7 +291,7 @@ rm -rf test_files
 python3 create_test_files.py
 
 # Verify clean state
-ls -la test_files/  # Should show 13 original files
+ls -la test_files/  # Should show 50 files
 ```
 
 ### Test Scenarios

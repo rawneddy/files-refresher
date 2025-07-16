@@ -10,6 +10,7 @@ import argparse
 import re
 import csv
 import logging
+import platform
 from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
@@ -69,6 +70,22 @@ class FileRefresher:
                 logging.StreamHandler() if not self.interactive else logging.NullHandler()
             ]
         )
+    
+    def clear_screen(self):
+        """Clear the console screen with cross-platform support"""
+        try:
+            # For Windows, use cls command which works better than Rich's clear
+            if platform.system() == "Windows":
+                os.system('cls')
+                # Also try Rich's clear as backup
+                self.console.clear()
+            else:
+                # For Unix/Linux/Mac, Rich's clear usually works fine
+                self.console.clear()
+                
+        except Exception:
+            # Fallback: print newlines to simulate clearing
+            print('\n' * 50)
         
     def _load_config(self, config_path):
         """Load configuration from YAML file"""
@@ -97,7 +114,7 @@ class FileRefresher:
     
     def show_welcome_screen(self):
         """Display retro welcome screen"""
-        self.console.clear()
+        self.clear_screen()
         
         # ASCII Art Logo
         logo = """
@@ -213,7 +230,7 @@ class FileRefresher:
     
     def get_mode_selection(self) -> str:
         """Get user selection for operation mode"""
-        self.console.clear()
+        self.clear_screen()
         self._show_step_header("MODE SELECTION", "Step 2 of 4")
         
         self.console.print("\n[accent]Choose operation mode:[/accent]")
@@ -226,7 +243,7 @@ class FileRefresher:
     
     def get_operation_type(self, selected_path: str = "") -> str:
         """Get user selection for operation type (Directory mode only)"""
-        self.console.clear()
+        self.clear_screen()
         self._show_step_header("OPERATION TYPE", "Step 4 of 4", selected_path)
         
         self.console.print("\n[accent]Choose operation type:[/accent]")
@@ -240,7 +257,7 @@ class FileRefresher:
     
     def get_csv_input(self) -> str:
         """Get CSV input file path with validation"""
-        self.console.clear()
+        self.clear_screen()
         self._show_step_header("CSV INPUT SELECTION", "Step 3 of 3")
         
         self.console.print("\n[accent]Select your CSV file:[/accent]")
@@ -323,7 +340,7 @@ class FileRefresher:
     
     def get_directory_input(self) -> str:
         """Get directory path from user with validation"""
-        self.console.clear()
+        self.clear_screen()
         self._show_step_header("DIRECTORY SELECTION", "Step 3 of 4")
         
         self.console.print("\n[accent]Select target directory:[/accent]")
@@ -367,7 +384,7 @@ class FileRefresher:
     
     def show_config_review(self):
         """Display configuration review screen"""
-        self.console.clear()
+        self.clear_screen()
         self._show_step_header("CONFIGURATION REVIEW", "Step 1 of 4")
         
         self.console.print("\n[accent]Review default settings before proceeding:[/accent]")
@@ -452,7 +469,7 @@ class FileRefresher:
     
     def show_pre_scan_summary(self, files: List[Dict], selected_path: str = "") -> bool:
         """Display pre-scan summary and get confirmation"""
-        self.console.clear()
+        self.clear_screen()
         if self.dry_run:
             step_info = "Review report scope"
         elif self.refresh_only:
@@ -943,7 +960,7 @@ class FileRefresher:
     
     def show_completion_summary(self, results, selected_path: str = ""):
         """Display completion summary"""
-        self.console.clear()
+        self.clear_screen()
         self._show_step_header("PROCESSING COMPLETE", "Operation finished", selected_path)
         renamed_count = sum(1 for r in results if r['renamed'])
         updated_count = sum(1 for r in results if r['date_updated'])

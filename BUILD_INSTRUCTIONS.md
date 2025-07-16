@@ -32,9 +32,9 @@ The script will:
 3. Install all dependencies
 4. Generate the application icon
 5. Build the executable using PyInstaller
-6. Package everything in `dist\windows\`
+6. Package everything in `dist\win\`
 
-**Output**: `dist\windows\file_refresher.exe` with all necessary files
+**Output**: `dist\win\file_refresher.exe` with all necessary files
 
 ### Manual Build
 
@@ -57,11 +57,11 @@ python create_icon.py
 pyinstaller file_refresher.spec --noconfirm
 
 # Package distribution
-mkdir dist\windows
-copy dist\file_refresher.exe dist\windows\
-copy config.yaml dist\windows\
-copy README.md dist\windows\
-copy USER_GUIDE.md dist\windows\
+mkdir dist\win
+move dist\file_refresher.exe dist\win\
+copy config.yaml dist\win\
+copy README.md dist\win\
+copy USER_GUIDE.md dist\win\
 ```
 
 ## Building Mac Executable
@@ -120,7 +120,7 @@ chmod +x dist/mac/file_refresher
 
 ### Windows
 ```cmd
-cd dist\windows
+cd dist\win
 
 # Option 1: Double-click file_refresher.exe in File Explorer
 # Option 2: Run from command prompt
@@ -163,7 +163,7 @@ python3 create_test_files.py
 ./dist/mac/file_refresher test_files --dry-run
 
 # On Windows:
-dist\windows\file_refresher.exe test_files --dry-run
+dist\win\file_refresher.exe test_files --dry-run
 ```
 
 ## Troubleshooting

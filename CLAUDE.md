@@ -6,9 +6,10 @@ This is a Python application designed to help keep files fresh by updating modif
 ## Key Requirements
 
 ### Core Functionality
-1. **Two Main Operations**:
-   - Update file modification dates to current datetime (for ALL files > 30 days old)
-   - Rename files by prepending original date as `YYYY.MM.DD` (only for configured extensions)
+1. **Three Main Operations**:
+   - Process Files: Rename files AND update modification dates
+   - Update Dates Only: Update modification dates without renaming
+   - Report Only: Generate CSV report without making changes
 
 2. **Processing Order**:
    - First: Check if file needs renaming (extension match + date logic)

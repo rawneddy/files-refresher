@@ -14,7 +14,7 @@ cd files-refresher
 build_windows.bat
 
 # Run the executable (can double-click or use command prompt)
-cd dist\windows
+cd dist\win
 file_refresher.exe
 ```
 
@@ -80,7 +80,7 @@ python3 file_refresher.py
 - Mode selection (Directory/CSV) with clear step indicators
 - Drag-and-drop support for files and directories
 - File browser integration (type 'browse')
-- Operation type selection (Process/Report Only)
+- Operation type selection (Process Files/Update Dates Only/Report Only)
 - Real-time progress tracking with screen clearing between steps
 
 ### Command Line Mode
@@ -106,6 +106,13 @@ python3 file_refresher.py /path/to/directory --no-ui
 3. Select your target folder
 4. Choose "Process Files"
 5. Confirm settings and proceed
+
+### Update Dates Only
+1. Run: `python3 file_refresher.py`
+2. Choose Directory mode
+3. Select your target folder
+4. Choose "Update Dates Only"
+5. Only modification dates will be updated (no renaming)
 
 ### Selective Processing
 1. Run with "Report Only" to generate CSV
