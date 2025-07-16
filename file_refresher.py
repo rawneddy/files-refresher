@@ -59,6 +59,7 @@ class FileRefresher:
         # Date patterns
         self.date_pattern_dots = re.compile(r'^(\d{4})\.(\d{2})\.(\d{2})\s+(.+)$')
         self.date_pattern_hyphens = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\s+(.+)$')
+        self.date_pattern_year_month = re.compile(r'^(\d{4})\.(\d{2})\s+(.+)$')
         
     def setup_logging(self):
         """Setup logging for error tracking"""
@@ -249,11 +250,31 @@ class FileRefresher:
         self.console.print("\n[accent]Choose operation type:[/accent]")
         self.console.print("[secondary]P[/secondary] - Process Files: Rename files AND update modification dates")
         self.console.print("[secondary]U[/secondary] - Update Dates Only: Update modification dates without renaming")
-        self.console.print("[secondary]R[/secondary] - Report Only: Generate CSV report without making changes")
+        self.console.print("[secondary]R[/secondary] - Report Only: Generate CSV report without making changes [default]")
         
         while True:
-            choice = Prompt.ask("\n[prompt]> OPERATION TYPE [P/U/R][/prompt]", choices=["P", "U", "R", "p", "u", "r"], default="P")
-            return choice.upper()
+            choice = Prompt.ask("\n[prompt]> OPERATION TYPE [P/U/R][/prompt]", choices=["P", "U", "R", "p", "u", "r"], default="R")
+            choice = choice.upper()
+            
+            # If user selects a file-modifying operation, confirm they understand the risks
+            if choice in ["P", "U"]:
+                self.console.print("\n[bold red]⚠️  WARNING: This operation will modify your files![/bold red]")
+                if choice == "P":
+                    self.console.print("[red]• Files will be RENAMED with date prefixes[/red]")
+                    self.console.print("[red]• Modification dates will be UPDATED[/red]")
+                elif choice == "U":
+                    self.console.print("[red]• Modification dates will be UPDATED[/red]")
+                self.console.print("[red]• There is NO UNDO or recovery option[/red]")
+                
+                confirm = Confirm.ask("\n[prompt]Are you sure you want to proceed with file modifications?[/prompt]", default=False)
+                if not confirm:
+                    self.console.print("\n[info]Returning to operation selection...[/info]")
+                    continue  # Go back to operation selection
+                else:
+                    return choice
+            else:
+                # Report only mode - no confirmation needed
+                return choice
     
     def get_csv_input(self) -> str:
         """Get CSV input file path with validation"""
@@ -481,6 +502,7 @@ class FileRefresher:
         stats = defaultdict(int)
         already_dated_dots = 0
         already_dated_hyphens = 0
+        already_dated_year_month = 0
         will_rename = 0
         will_update_date = 0
         
@@ -496,6 +518,10 @@ class FileRefresher:
                 already_dated_dots += 1
             elif self.date_pattern_hyphens.match(filename):
                 already_dated_hyphens += 1
+                if ext in self.rename_extensions and not self.refresh_only:
+                    will_rename += 1
+            elif self.date_pattern_year_month.match(filename):
+                already_dated_year_month += 1
                 if ext in self.rename_extensions and not self.refresh_only:
                     will_rename += 1
             elif ext in self.rename_extensions and not self.refresh_only:
@@ -543,6 +569,7 @@ class FileRefresher:
             # For report and process modes, show all statistics
             self.console.print(f"├─ Files already dated (YYYY.MM.DD): [accent]{already_dated_dots}[/accent]")
             self.console.print(f"├─ Files already dated (YYYY-MM-DD): [accent]{already_dated_hyphens}[/accent]")
+            self.console.print(f"├─ Files with year+month (YYYY.MM): [accent]{already_dated_year_month}[/accent]")
             self.console.print(f"├─ Files to rename: [accent]{will_rename}[/accent]")
             self.console.print(f"├─ Dates to update: [accent]{will_update_date}[/accent]")
             self.console.print(f"└─ TOTAL FILES: [accent]{len(files)}[/accent]")
@@ -551,9 +578,16 @@ class FileRefresher:
             self.console.print("\n[info]ℹ️  Report Only Mode - No files will be modified[/info]")
             prompt_text = "GENERATE REPORT FOR THESE FILES?"
         elif self.refresh_only:
+            self.console.print("\n[bold red]⚠️  WARNING: This operation will modify your files![/bold red]")
+            self.console.print("[bold red]   • File modification dates will be updated[/bold red]")
+            self.console.print("[bold red]   • This operation cannot be undone[/bold red]")
             self.console.print("\n[info]📅 Refresh Only Mode - Only modification dates will be updated[/info]")
             prompt_text = "REFRESH MODIFICATION DATES FOR THESE FILES?"
         else:
+            self.console.print("\n[bold red]⚠️  WARNING: This operation will modify your files![/bold red]")
+            self.console.print("[bold red]   • Files will be renamed with date prefixes[/bold red]")
+            self.console.print("[bold red]   • File modification dates will be updated[/bold red]")
+            self.console.print("[bold red]   • This operation cannot be undone[/bold red]")
             prompt_text = "PROCEED WITH FILE PROCESSING?"
             
         return Confirm.ask(f"\n[prompt]{prompt_text}[/prompt]", default=True)
@@ -579,6 +613,10 @@ class FileRefresher:
         if self.date_pattern_hyphens.match(filename):
             return True, 'convert_hyphens'
         
+        # Check if has YYYY.MM format (needs day added)
+        if self.date_pattern_year_month.match(filename):
+            return True, 'add_day'
+        
         # No date prefix, needs to be added
         return True, 'add_date'
     
@@ -592,6 +630,13 @@ class FileRefresher:
             if match:
                 year, month, day, rest = match.groups()
                 return f"{year}.{month}.{day} {rest}"
+        
+        elif rename_reason == 'add_day':
+            # Convert YYYY.MM to YYYY.MM.01
+            match = self.date_pattern_year_month.match(filename)
+            if match:
+                year, month, rest = match.groups()
+                return f"{year}.{month}.01 {rest}"
         
         elif rename_reason == 'add_date':
             # Add date prefix from original modification date

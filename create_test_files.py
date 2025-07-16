@@ -84,6 +84,12 @@ def create_test_files():
         ("2021-01-15 Strategic Plan.pptx", 140),
         ("2018-05-22 System Design.vsdx", 280),
         
+        # Files with year+month only (need day added as .01)
+        ("2023.06 Budget Summary.xlsx", 120),
+        ("2024.03 Marketing Plan.docx", 90),
+        ("2022.11 Sales Report.pptx", 180),
+        ("2023.09 Network Design.vsdx", 150),
+        
         # Non-office files (shouldn't be renamed but dates updated if old)
         ("readme.txt", 400),
         ("installation_guide.txt", 120),
@@ -141,6 +147,23 @@ def create_test_files():
     print(f"\nAge distribution:")
     print(f"  - Files older than 30 days: {old_files}")
     print(f"  - Recent files (≤30 days): {recent_files}")
+    
+    # Count files by date pattern for testing
+    import re
+    dots_pattern = re.compile(r'^(\d{4})\.(\d{2})\.(\d{2})\s+(.+)$')
+    hyphens_pattern = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\s+(.+)$')
+    year_month_pattern = re.compile(r'^(\d{4})\.(\d{2})\s+(.+)$')
+    
+    dots_count = len([f for f in test_files if dots_pattern.match(f[0])])
+    hyphens_count = len([f for f in test_files if hyphens_pattern.match(f[0])])
+    year_month_count = len([f for f in test_files if year_month_pattern.match(f[0])])
+    no_date_count = len([f for f in test_files if not (dots_pattern.match(f[0]) or hyphens_pattern.match(f[0]) or year_month_pattern.match(f[0]))])
+    
+    print(f"\nDate pattern distribution:")
+    print(f"  - YYYY.MM.DD format: {dots_count}")
+    print(f"  - YYYY-MM-DD format: {hyphens_count}")
+    print(f"  - YYYY.MM format: {year_month_count}")
+    print(f"  - No date prefix: {no_date_count}")
 
 if __name__ == "__main__":
     create_test_files()
