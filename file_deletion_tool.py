@@ -135,7 +135,7 @@ def prune_directory(target_root: Path, keep: set[str], report_csv: Path) -> None
         for fname in files:
             total_files += 1
             file_path_obj = Path(root, fname)
-            canon = _canonical(_sanitize(str(file_path_obj)))
+            canon = _canonical(file_path_obj)
 
             if canon in keep:
                 continue  # keep the file
