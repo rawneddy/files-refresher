@@ -11,7 +11,7 @@ Prerequisite
 ──────────────────────────────────────────────────────────────────────────
 Usage
 ──────────────────────────────────────────────────────────────────────────
-    python prune_except_list.py <target_dir> <keep_csv> <report_csv> [path_column]
+    python file_deletion_tool.py <target_dir> <keep_csv> <report_csv> [path_column]
 
     target_dir   – Root folder whose files will be examined.
     keep_csv     – CSV whose first row is a header and whose *path_column*
@@ -29,9 +29,10 @@ Behaviour
   to the Recycle Bin / Trash via `send2trash`.
 • Matching is case-insensitive on Windows.
 • Prints a summary (Moved X/Y files…) and writes *report_csv*.
+• Path comparisons use a robust *canonical* form, eliminating mismatches caused by different slashes, redundant “..”, or drive‑letter case.
 
 Example:
-    python prune_except_list.py "C:\\Data" keep_list.csv deleted_report.csv 2
+    python file_deletion_tool.py "C:\\Data" keep_list.csv deleted_report.csv 2
 """
 
 import csv
@@ -40,9 +41,18 @@ import sys
 from pathlib import Path
 from send2trash import send2trash    # moves files to Recycle Bin / Trash
 
-def _norm_case_resolved(p: Path) -> str:
-    """Return a normalised, resolved, case‑folded string path for reliable comparison."""
-    return os.path.normcase(str(p.expanduser().resolve(strict=False)))
+def _canonical(path: Path) -> str:
+    """
+    Return a fully‑qualified, normalised, case‑folded string suitable for
+    fast equality comparison across platforms.
+
+    • Resolves symlinks where possible (but `strict=False` so missing files
+      are tolerated).
+    • Uses `os.path.normpath` to collapse redundant separators/`..`.
+    • Uses `os.path.normcase` to fold case on Windows.
+    """
+    resolved = path.expanduser().resolve(strict=False)
+    return os.path.normcase(os.path.normpath(str(resolved)))
 
 def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> set[str]:
     """
@@ -73,14 +83,12 @@ def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> s
                 continue
 
             # Failsafe: ensure p is inside target_root
-            try:
-                p.relative_to(target_root)
-            except ValueError:
+            if os.path.commonpath([_canonical(target_root), _canonical(p)]) != _canonical(target_root):
                 raise ValueError(
                     f"CSV path '{p}' is not inside target directory '{target_root}'. "
                     "Aborting to protect your files."
                 )
-            keep.add(_norm_case_resolved(p))
+            keep.add(_canonical(p))
 
     return keep
 
@@ -88,7 +96,7 @@ def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> s
 def prune_directory(target_root: Path, keep: set[str], report_csv: Path) -> None:
     """
     Walk target_root recursively. Move every file **not** in `keep` to the system Recycle Bin / Trash.
-    Matching is case-insensitive on Windows.
+    Matching is case-insensitive where the OS is.
     Write a CSV report of files that were deleted (and any errors).
     """
     deleted_rows: list[list[str]] = []
@@ -100,9 +108,9 @@ def prune_directory(target_root: Path, keep: set[str], report_csv: Path) -> None
         for fname in files:
             total_files += 1
             file_path_obj = Path(root, fname)
-            norm_path = _norm_case_resolved(file_path_obj)
+            canon = _canonical(file_path_obj)
 
-            if norm_path in keep:
+            if canon in keep:
                 continue  # keep the file
 
             try:
