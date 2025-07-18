@@ -1,4 +1,38 @@
 #!/usr/bin/env python
+"""
+Prune a directory tree by moving every file *except* those listed in a CSV
+to the system Recycle Bin / Trash (cross‑platform).
+
+──────────────────────────────────────────────────────────────────────────
+Prerequisite
+──────────────────────────────────────────────────────────────────────────
+    pip install send2trash
+
+──────────────────────────────────────────────────────────────────────────
+Usage
+──────────────────────────────────────────────────────────────────────────
+    python prune_except_list.py <target_dir> <keep_csv> <report_csv> [path_column]
+
+    target_dir   – Root folder whose files will be examined.
+    keep_csv     – CSV whose first row is a header and whose *path_column*
+                    lists the *absolute* file paths to **keep**.
+    report_csv   – Script will write a report of every file it moved
+                    (columns: deleted_path,error).
+    path_column  – (optional, 1‑based) Column number in keep_csv that holds
+                    the paths. Defaults to 1 if omitted.
+
+──────────────────────────────────────────────────────────────────────────
+Behaviour
+──────────────────────────────────────────────────────────────────────────
+• Verifies that every path in keep_csv resides inside target_dir; aborts if not.
+• Recursively walks target_dir. Each file **not** in the keep list is sent
+  to the Recycle Bin / Trash via `send2trash`.
+• Prints a summary (Moved X/Y files…) and writes *report_csv*.
+
+Example:
+    python prune_except_list.py "C:\\Data" keep_list.csv deleted_report.csv 2
+"""
+
 import csv
 import os
 import sys
@@ -83,6 +117,7 @@ def prune_directory(target_root: Path, keep: set[Path], report_csv: Path) -> Non
 def main() -> None:
     if len(sys.argv) not in (4, 5):
         print("Usage:  python prune_except_list.py <target_dir> <keep_csv> <report_csv> [path_column]")
+        print("        (Requires the 'send2trash' package – install with: pip install send2trash)")
         sys.exit(1)
 
     target_dir = Path(sys.argv[1]).expanduser().resolve()
