@@ -30,6 +30,8 @@ Behaviour
 • Matching is case-insensitive on Windows.
 • Prints a summary (Moved X/Y files…) and writes *report_csv*.
 • Path comparisons use a robust *canonical* form, eliminating mismatches caused by different slashes, redundant “..”, or drive‑letter case.
+• Text normalisation strips hidden NBSPs and converts fancy dashes to '-' for reliable matching.
+• Before deleting, the script shows how many keep‑paths it found and asks for confirmation.
 
 Example:
     python file_deletion_tool.py "C:\\Data" keep_list.csv deleted_report.csv 2
@@ -38,10 +40,12 @@ Example:
 import csv
 import os
 import sys
+import re
+import unicodedata
 from pathlib import Path
 from send2trash import send2trash    # moves files to Recycle Bin / Trash
 
-def _canonical(path: Path) -> str:
+def _canonical(path: str | Path) -> str:
     """
     Return a fully‑qualified, normalised, case‑folded string suitable for
     fast equality comparison across platforms.
@@ -51,8 +55,32 @@ def _canonical(path: Path) -> str:
     • Uses `os.path.normpath` to collapse redundant separators/`..`.
     • Uses `os.path.normcase` to fold case on Windows.
     """
+    if isinstance(path, str):
+        path = Path(path)
     resolved = path.expanduser().resolve(strict=False)
     return os.path.normcase(os.path.normpath(str(resolved)))
+
+_DASH_CHARS = "\u2010\u2011\u2012\u2013\u2014\u2015"
+
+def _sanitize(raw: str) -> str:
+    """
+    Normalise a raw path string to avoid hidden‑character mismatches.
+
+    • Converts NO‑BREAK SPACE (U+00A0) to regular space.
+    • Replaces any Unicode dash character (–, —, etc.) with ASCII '-'.
+    • Strips surrounding quotes, normalises unicode (NFC), collapses
+      runs of whitespace to single space.
+
+    This is *textual* normalisation; `_canonical` then handles path
+    resolution / case‑folding.
+    """
+    raw = raw.strip().strip('"').strip("'")
+    raw = raw.replace("\u00A0", " ")
+    trans = str.maketrans({ch: "-" for ch in _DASH_CHARS})
+    raw = raw.translate(trans)
+    raw = unicodedata.normalize("NFC", raw)
+    raw = re.sub(r"\s+", " ", raw)
+    return raw
 
 def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> set[str]:
     """
@@ -71,8 +99,7 @@ def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> s
         for row in reader:
             if not row:
                 continue
-            raw = row[path_col_idx].strip() if len(row) > path_col_idx else ""
-            raw = raw.strip().strip('"').strip("'")
+            raw = _sanitize(row[path_col_idx]) if len(row) > path_col_idx else ""
             if not raw:
                 continue
 
@@ -108,7 +135,7 @@ def prune_directory(target_root: Path, keep: set[str], report_csv: Path) -> None
         for fname in files:
             total_files += 1
             file_path_obj = Path(root, fname)
-            canon = _canonical(file_path_obj)
+            canon = _canonical(_sanitize(str(file_path_obj)))
 
             if canon in keep:
                 continue  # keep the file
@@ -166,6 +193,13 @@ def main() -> None:
     except ValueError as ex:
         print(ex)
         sys.exit(1)
+
+    detected = len(keep_set)
+    print(f"Detected {detected} unique file path(s) to keep (from '{keep_csv.name}').")
+    reply = input("Proceed with pruning? [y/N]: ").strip().lower()
+    if reply not in ("y", "yes"):
+        print("Operation cancelled by user.")
+        sys.exit(0)
 
     prune_directory(target_dir, keep_set, report_csv)
 
