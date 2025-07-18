@@ -121,7 +121,7 @@ def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> s
     return keep
 
 
-def prune_directory(target_root: Path, keep: set[str], keep_names: set[str], report_csv: Path) -> None:
+def prune_directory(target_root: Path, keep: set[str], keep_names: set[str], report_csv: Path, diag_csv: Path) -> None:
     """
     Walk target_root recursively. Move every file **not** in `keep` to the system Recycle Bin / Trash.
     Matching is case-insensitive where the OS is.
@@ -133,21 +133,31 @@ def prune_directory(target_root: Path, keep: set[str], keep_names: set[str], rep
     total_files = 0
     moved_files = 0
 
-    for root, _, files in os.walk(target_root):
-        for fname in files:
-            total_files += 1
-            file_path_obj = Path(root, fname)
-            canon = _canonical(file_path_obj)
+    # Diagnostics: record keep list and file-by-file status
+    with diag_csv.open('w', newline='', encoding='utf-8') as df:
+        diag_writer = csv.writer(df)
+        diag_writer.writerow(['type','file_path','canonical','file_name','in_keep_set','name_match'])
+        for kp in sorted(keep):
+            diag_writer.writerow(['keep', kp, '', '', '',''])
+        # Walk files and write diagnostics for each
+        for root, _, files in os.walk(target_root):
+            for fname in files:
+                total_files += 1
+                file_path_obj = Path(root, fname)
+                canon = _canonical(file_path_obj)
+                name_match = file_path_obj.name in keep_names
+                in_keep = canon in keep
+                diag_writer.writerow(['file', str(file_path_obj), canon, file_path_obj.name, str(in_keep), str(name_match)])
 
-            if canon in keep or file_path_obj.name in keep_names:
-                continue  # keep the file
+                if in_keep or name_match:
+                    continue  # keep the file
 
-            try:
-                send2trash(str(file_path_obj))
-                moved_files += 1
-                deleted_rows.append([str(file_path_obj.resolve()), ""])     # no error
-            except Exception as e:                            # noqa: BLE001
-                deleted_rows.append([str(file_path_obj.resolve()), str(e)])
+                try:
+                    send2trash(str(file_path_obj))
+                    moved_files += 1
+                    deleted_rows.append([str(file_path_obj.resolve()), ""])     # no error
+                except Exception as e:                            # noqa: BLE001
+                    deleted_rows.append([str(file_path_obj.resolve()), str(e)])
 
     # write report
     with report_csv.open("w", newline='', encoding='utf-8') as f:
@@ -169,6 +179,7 @@ def main() -> None:
     target_dir = Path(sys.argv[1]).expanduser().resolve()
     keep_csv = Path(sys.argv[2]).expanduser().resolve()
     report_csv = Path(sys.argv[3]).expanduser().resolve()
+    diag_csv = report_csv.with_name(report_csv.stem + '_diagnostics.csv')
 
     # Optional 1‑based column number for paths in the CSV
     path_column = 1
@@ -206,7 +217,7 @@ def main() -> None:
         print("Operation cancelled by user.")
         sys.exit(0)
 
-    prune_directory(target_dir, keep_set, keep_names, report_csv)
+    prune_directory(target_dir, keep_set, keep_names, report_csv, diag_csv)
 
 
 if __name__ == "__main__":
