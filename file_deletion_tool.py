@@ -65,7 +65,8 @@ def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> s
             # Failsafe: ensure path is under target_root
             if not str(p).startswith(str(target_root)):
                 raise ValueError(f"CSV path '{p}' is not inside target directory '{target_root}'. Aborting.")
-            keep.add(str(p))
+            p_str = os.path.normpath(str(p))
+            keep.add(p_str.lower())
     return keep
 
 
@@ -90,8 +91,9 @@ def prune_directory(target_root: Path, keep: set[str], report_csv: Path, diag_cs
             for fname in files:
                 total_files += 1
                 file_path_obj = Path(root, fname)
-                full = str(file_path_obj.resolve())
-                in_keep = full in keep
+                full = os.path.normpath(str(file_path_obj.resolve()))
+                full_lower = full.lower()
+                in_keep = full_lower in keep
                 diag_writer.writerow(['file', full, str(in_keep)])
 
                 if in_keep:
