@@ -32,6 +32,7 @@ Behaviour
 • Path comparisons use a robust *canonical* form, eliminating mismatches caused by different slashes, redundant “..”, or drive‑letter case.
 • Text normalisation strips hidden NBSPs and converts fancy dashes to '-' for reliable matching.
 • Before deleting, the script shows how many keep‑paths it found and asks for confirmation.
+• Also preserves any file whose **filename** matches one in the keep list.
 
 Example:
     python file_deletion_tool.py "C:\\Data" keep_list.csv deleted_report.csv 2
@@ -120,11 +121,12 @@ def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> s
     return keep
 
 
-def prune_directory(target_root: Path, keep: set[str], report_csv: Path) -> None:
+def prune_directory(target_root: Path, keep: set[str], keep_names: set[str], report_csv: Path) -> None:
     """
     Walk target_root recursively. Move every file **not** in `keep` to the system Recycle Bin / Trash.
     Matching is case-insensitive where the OS is.
     Write a CSV report of files that were deleted (and any errors).
+    • Also preserves any file whose **filename** matches one in the keep list.
     """
     deleted_rows: list[list[str]] = []
 
@@ -137,7 +139,7 @@ def prune_directory(target_root: Path, keep: set[str], report_csv: Path) -> None
             file_path_obj = Path(root, fname)
             canon = _canonical(file_path_obj)
 
-            if canon in keep:
+            if canon in keep or file_path_obj.name in keep_names:
                 continue  # keep the file
 
             try:
@@ -194,6 +196,9 @@ def main() -> None:
         print(ex)
         sys.exit(1)
 
+    # Also allow matching by file name if full path fails
+    keep_names = {Path(p).name for p in keep_set}
+
     detected = len(keep_set)
     print(f"Detected {detected} unique file path(s) to keep (from '{keep_csv.name}').")
     reply = input("Proceed with pruning? [y/N]: ").strip().lower()
@@ -201,7 +206,7 @@ def main() -> None:
         print("Operation cancelled by user.")
         sys.exit(0)
 
-    prune_directory(target_dir, keep_set, report_csv)
+    prune_directory(target_dir, keep_set, keep_names, report_csv)
 
 
 if __name__ == "__main__":
