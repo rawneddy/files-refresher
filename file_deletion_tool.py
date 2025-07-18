@@ -27,10 +27,8 @@ Behaviour
 • Verifies that every path in keep_csv resides inside target_dir; aborts if not.
 • Recursively walks target_dir. Each file **not** in the keep list is sent
   to the Recycle Bin / Trash via `send2trash`.
-• Matching is case-insensitive on Windows.
+• Matching is a simple string comparison of absolute paths.
 • Prints a summary (Moved X/Y files…) and writes *report_csv*.
-• Path comparisons use a robust *canonical* form, eliminating mismatches caused by different slashes, redundant “..”, or drive‑letter case.
-• Text normalisation strips hidden NBSPs and converts fancy dashes to '-' for reliable matching.
 • Before deleting, the script shows how many keep‑paths it found and asks for confirmation.
 • Also preserves any file whose **filename** matches one in the keep list.
 
@@ -41,92 +39,40 @@ Example:
 import csv
 import os
 import sys
-import re
-import unicodedata
 from pathlib import Path
 from send2trash import send2trash    # moves files to Recycle Bin / Trash
-
-def _canonical(path: str | Path) -> str:
-    """
-    Return a fully‑qualified, normalised, case‑folded string suitable for
-    fast equality comparison across platforms.
-
-    • Resolves symlinks where possible (but `strict=False` so missing files
-      are tolerated).
-    • Uses `os.path.normpath` to collapse redundant separators/`..`.
-    • Uses `os.path.normcase` to fold case on Windows.
-    """
-    if isinstance(path, str):
-        path = Path(path)
-    resolved = path.expanduser().resolve(strict=False)
-    return os.path.normcase(os.path.normpath(str(resolved)))
-
-_DASH_CHARS = "\u2010\u2011\u2012\u2013\u2014\u2015"
-
-def _sanitize(raw: str) -> str:
-    """
-    Normalise a raw path string to avoid hidden‑character mismatches.
-
-    • Converts NO‑BREAK SPACE (U+00A0) to regular space.
-    • Replaces any Unicode dash character (–, —, etc.) with ASCII '-'.
-    • Strips surrounding quotes, normalises unicode (NFC), collapses
-      runs of whitespace to single space.
-
-    This is *textual* normalisation; `_canonical` then handles path
-    resolution / case‑folding.
-    """
-    raw = raw.strip().strip('"').strip("'")
-    raw = raw.replace("\u00A0", " ")
-    trans = str.maketrans({ch: "-" for ch in _DASH_CHARS})
-    raw = raw.translate(trans)
-    raw = unicodedata.normalize("NFC", raw)
-    raw = re.sub(r"\s+", " ", raw)
-    return raw
 
 def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> set[str]:
     """
     USAGE: python prune_except_list.py  "C:\\Target\\Folder"  keep_list.csv  deleted_report.csv  [path_column]
     Read the first column (after header) of csv_path and return a set of
-    *absolute, normalised, case-insensitive* string paths that must be preserved.
+    *absolute* string paths that must be preserved.
     path_col_idx is zero‑based (0 = first column) and is supplied by the --path_column command parameter.
 
     Aborts if any listed path is outside target_root.
     """
     keep: set[str] = set()
-
     with csv_path.open(newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
-        next(reader, None)                              # skip header
+        next(reader, None)
         for row in reader:
-            if not row:
+            if not row or len(row) <= path_col_idx:
                 continue
-            raw = _sanitize(row[path_col_idx]) if len(row) > path_col_idx else ""
+            raw = row[path_col_idx].strip().strip('"').strip("'")
             if not raw:
                 continue
-
-            try:
-                p = Path(raw).expanduser().resolve(strict=False)
-            except (OSError, RuntimeError):
-                # Malformed path – ignore it (nothing to preserve)
-                continue
-
-            # Failsafe: ensure p is inside target_root
-            if os.path.commonpath([_canonical(target_root), _canonical(p)]) != _canonical(target_root):
-                raise ValueError(
-                    f"CSV path '{p}' is not inside target directory '{target_root}'. "
-                    "Aborting to protect your files."
-                )
-            keep.add(_canonical(p))
-
+            p = Path(raw).expanduser().resolve(strict=False)
+            # Failsafe: ensure path is under target_root
+            if not str(p).startswith(str(target_root)):
+                raise ValueError(f"CSV path '{p}' is not inside target directory '{target_root}'. Aborting.")
+            keep.add(str(p))
     return keep
 
 
-def prune_directory(target_root: Path, keep: set[str], keep_names: set[str], report_csv: Path, diag_csv: Path) -> None:
+def prune_directory(target_root: Path, keep: set[str], report_csv: Path, diag_csv: Path) -> None:
     """
     Walk target_root recursively. Move every file **not** in `keep` to the system Recycle Bin / Trash.
-    Matching is case-insensitive where the OS is.
     Write a CSV report of files that were deleted (and any errors).
-    • Also preserves any file whose **filename** matches one in the keep list.
     """
     deleted_rows: list[list[str]] = []
 
@@ -136,20 +82,19 @@ def prune_directory(target_root: Path, keep: set[str], keep_names: set[str], rep
     # Diagnostics: record keep list and file-by-file status
     with diag_csv.open('w', newline='', encoding='utf-8') as df:
         diag_writer = csv.writer(df)
-        diag_writer.writerow(['type','file_path','canonical','file_name','in_keep_set','name_match'])
+        diag_writer.writerow(['type','file_path','in_keep'])
         for kp in sorted(keep):
-            diag_writer.writerow(['keep', kp, '', '', '',''])
+            diag_writer.writerow(['keep', kp, ''])
         # Walk files and write diagnostics for each
         for root, _, files in os.walk(target_root):
             for fname in files:
                 total_files += 1
                 file_path_obj = Path(root, fname)
-                canon = _canonical(file_path_obj)
-                name_match = file_path_obj.name in keep_names
-                in_keep = canon in keep
-                diag_writer.writerow(['file', str(file_path_obj), canon, file_path_obj.name, str(in_keep), str(name_match)])
+                full = str(file_path_obj.resolve())
+                in_keep = full in keep
+                diag_writer.writerow(['file', full, str(in_keep)])
 
-                if in_keep or name_match:
+                if in_keep:
                     continue  # keep the file
 
                 try:
@@ -207,9 +152,6 @@ def main() -> None:
         print(ex)
         sys.exit(1)
 
-    # Also allow matching by file name if full path fails
-    keep_names = {Path(p).name for p in keep_set}
-
     detected = len(keep_set)
     print(f"Detected {detected} unique file path(s) to keep (from '{keep_csv.name}').")
     reply = input("Proceed with pruning? [y/N]: ").strip().lower()
@@ -217,7 +159,7 @@ def main() -> None:
         print("Operation cancelled by user.")
         sys.exit(0)
 
-    prune_directory(target_dir, keep_set, keep_names, report_csv, diag_csv)
+    prune_directory(target_dir, keep_set, report_csv, diag_csv)
 
 
 if __name__ == "__main__":
