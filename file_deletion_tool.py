@@ -3,12 +3,14 @@ import csv
 import os
 import sys
 from pathlib import Path
+from send2trash import send2trash    # moves files to Recycle Bin / Trash
 
-def load_keep_set(csv_path: Path, target_root: Path) -> set[Path]:
+def load_keep_set(csv_path: Path, target_root: Path, path_col_idx: int = 0) -> set[Path]:
     """
-    USAGE: python prune_except_list.py  "C:\Target\Folder"  keep_list.csv  deleted_report.csv
+    USAGE: python prune_except_list.py  "C:\Target\Folder"  keep_list.csv  deleted_report.csv  [path_column]
     Read the first column (after header) of csv_path and return a set of
     *absolute, normalised* Path objects that must be preserved.
+    path_col_idx is zero‑based (0 = first column) and is supplied by the --path_column command parameter.
 
     Aborts if any listed path is outside target_root.
     """
@@ -20,7 +22,7 @@ def load_keep_set(csv_path: Path, target_root: Path) -> set[Path]:
         for row in reader:
             if not row:
                 continue
-            raw = row[0].strip()
+            raw = row[path_col_idx].strip() if len(row) > path_col_idx else ""
             if not raw:
                 continue
 
@@ -45,7 +47,7 @@ def load_keep_set(csv_path: Path, target_root: Path) -> set[Path]:
 
 def prune_directory(target_root: Path, keep: set[Path], report_csv: Path) -> None:
     """
-    Walk target_root recursively. Delete every file **not** in `keep`.
+    Walk target_root recursively. Move every file **not** in `keep` to the system Recycle Bin / Trash.
     Write a CSV report of files that were deleted (and any errors).
     """
     deleted_rows: list[list[str]] = []
@@ -62,7 +64,7 @@ def prune_directory(target_root: Path, keep: set[Path], report_csv: Path) -> Non
                 continue  # keep the file
 
             try:
-                os.remove(file_path)
+                send2trash(str(file_path))
                 deleted_files += 1
                 deleted_rows.append([str(file_path), ""])     # no error
             except Exception as e:                            # noqa: BLE001
@@ -74,18 +76,30 @@ def prune_directory(target_root: Path, keep: set[Path], report_csv: Path) -> Non
         writer.writerow(["deleted_path", "error"])
         writer.writerows(deleted_rows)
 
-    print(f"Deleted {deleted_files}/{total_files} files under '{target_root}'")
+    print(f"Moved {deleted_files}/{total_files} files to Recycle Bin / Trash under '{target_root}'")
     print(f"Detailed report written to '{report_csv}'")
 
 
 def main() -> None:
-    if len(sys.argv) != 4:
-        print("Usage:  python prune_except_list.py <target_dir> <keep_csv> <report_csv>")
+    if len(sys.argv) not in (4, 5):
+        print("Usage:  python prune_except_list.py <target_dir> <keep_csv> <report_csv> [path_column]")
         sys.exit(1)
 
     target_dir = Path(sys.argv[1]).expanduser().resolve()
     keep_csv = Path(sys.argv[2]).expanduser().resolve()
     report_csv = Path(sys.argv[3]).expanduser().resolve()
+
+    # Optional 1‑based column number for paths in the CSV
+    path_column = 1
+    if len(sys.argv) == 5:
+        try:
+            path_column = int(sys.argv[4])
+            if path_column < 1:
+                raise ValueError
+        except ValueError:
+            print("Error: path_column must be a positive integer (1‑based index).")
+            sys.exit(1)
+    path_col_idx = path_column - 1  # convert to 0‑based for internal use
 
     if not target_dir.is_dir():
         print(f"Error: target directory '{target_dir}' does not exist or is not a directory.")
@@ -96,7 +110,7 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        keep_set = load_keep_set(keep_csv, target_dir)
+        keep_set = load_keep_set(keep_csv, target_dir, path_col_idx)
     except ValueError as ex:
         print(ex)
         sys.exit(1)
